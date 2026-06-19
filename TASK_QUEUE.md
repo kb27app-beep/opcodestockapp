@@ -11,11 +11,14 @@
 - Batch 4: real financials wired into Financial Breakdown, Valuation, Full Analysis.
 - Batch 5: search autocomplete, sortable watchlist, firing target/stop alerts.
 
-## Open / future
-- Anchor the multi-year financial trend charts to real data (Yahoo gives TTM only — would
-  need a fundamentals-timeseries source).
-- Background alert polling (currently evaluated on watchlist refresh).
-- Optional paid fundamentals fallback (FMP/Alpha Vantage) for machines without local Chrome.
+## Next up (see PLAN_NEXT.md for the full brief)
+- [ ] Feature A: real-time background alert polling (poller + channel dispatch + settings).
+- [ ] Feature B: optional paid fundamentals fallback (FMP via FMP_API_KEY env var).
+      Remember to broaden the source==='yahoo-quoteSummary' checks in js/data.js (:144, :383).
+
+## Later / future
+- Anchor the multi-year financial trend charts to real data (Yahoo gives TTM only — needs a
+  fundamentals-timeseries source).
 
 ## Notes
 - Live fundamentals need a local Chrome (channel:'chrome'); falls back to estimates otherwise.

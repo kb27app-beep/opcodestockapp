@@ -1,32 +1,25 @@
-# CHECKPOINT — ARYA'S Stocks Pro revision (complete)
+# CHECKPOINT — ARYA'S Stocks Pro
 
-## Status: all requested work done + verified in a real browser
+## NEXT SESSION: read PLAN_NEXT.md first
+Two features to build next: (A) real-time background alert polling and (B) optional paid
+fundamentals fallback. Full step-by-step brief, file anchors, gotchas, and verify recipes are
+in **PLAN_NEXT.md**. User rules: no GitHub PR, never push to main, continue on branch
+`upgrade/site-overhaul`, commit + push each feature.
 
-### Live fundamentals (crumb automation)
-- `yahoo-auth.js`: headless system Chrome via playwright-core, consent-wall handling,
-  resource blocking, waitUntil:'commit', crumb poll, in-page quoteSummary fetch,
-  per-symbol 10-min cache, 5-min idle close, 429 backoff, graceful degrade.
-- `server.js` `/yf-fundamentals?symbol=` -> verified 200 with real data (Apple, Reliance).
-- Frontend `fetchFundamentals()` merges real marketCap/PE/sector; (est.) clears when live.
+## State (all DONE, committed + pushed on upgrade/site-overhaul)
+- Foundation + Batches 0-5 complete: live Yahoo fundamentals, SSRF lockdown, modular js/ split,
+  cache.js + session persistence + rate-limit queue, /healthz + /yf-status, email hardening,
+  graceful shutdown, test harness (18 tests green), a11y + redesign, real financials in modules,
+  search autocomplete, sortable watchlist, firing target/stop alerts.
+- 8 commits on the branch (foundation + Batch 0-5 + docs). Working tree clean.
 
-### File split
-- index.html (markup) + styles.css + app.js. Buildless; server serves all 200.
-- Fixed 9 pre-existing literal ${...} bugs in static body; init syncs market/theme chrome.
+## Verify commands
+- `npm test` (offline, 12) and `npm run test:e2e` (Chrome, 6). Both green.
+- Live browser checks: spawn `PORT=3000 node server.js` + playwright-core channel:'chrome',
+  run with dangerouslyDisableSandbox for network; waitUntil:'commit' + sleep.
 
-### UI modernization ("editorial fintech terminal")
-- Fonts: Fraunces (display) / Spline Sans (body) / JetBrains Mono (figures).
-- Warm-paper light + warm-ink dark themes (setTheme palettes updated to match styles.css).
-- Atmosphere (radial washes + grain), refined cards/buttons/nav, micro-interactions,
-  theme-aware gold charts (chartAccent()), currency-correct fmtMcap, YAHOO_SECTOR_PE map,
-  inline SVG favicon, "India"/"US" label.
-
-## Verification (Playwright screenshots, channel:'chrome')
-- /tmp/shot_light_dashboard.png, shot_dark_analyzed.png etc. — both themes render cleanly.
-- Analyzed views show REAL data with no (est.) markers: Apple Inc./Technology/PE 36.1,
-  Reliance/Energy/PE 22.2/real 52w range. Charts gold + tabular mono numbers.
-- node -c on server.js / app.js / yahoo-auth.js all OK.
-- Only headless-only noise: sql.js WASM init fails in headless (localStorage fallback covers it).
-
-## Not done (left as choices for the user)
-- Wiring real financials into the 10 analysis modules' prose (still templated).
-- Committing (not done — needs explicit ask; never push to main).
+## Key gotchas for next session
+- Broaden the two hardcoded `source === 'yahoo-quoteSummary'` checks (js/data.js:144 and :383)
+  so an 'fmp' fallback source counts as live (Feature B).
+- Telegram delivery needs api.telegram.org added to PROXY_ALLOWED_HOSTS in server.js (Feature A).
+- Yahoo 429-throttles; .cache/ persists fundamentals + session. sql.js wasm fails in headless (ok).
