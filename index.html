@@ -15,16 +15,18 @@
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+<a href="#mainContent" class="skip-link">Skip to content</a>
 
-<div class="context-menu" id="ctxMenu">
+<div class="context-menu" id="ctxMenu" role="menu">
   <button class="context-menu-item" id="ctxAddWatchlist"><i class="fas fa-bookmark"></i> <span id="ctxActionText">Add to Watchlist</span></button>
   <div class="context-menu-divider"></div>
   <button class="context-menu-item" id="ctxAnalyze"><i class="fas fa-search"></i> Analyze Stock</button>
   <button class="context-menu-item" id="ctxCopy"><i class="fas fa-copy"></i> Copy Symbol</button>
 </div>
 
-<button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
-<nav class="sidebar" id="sidebar">
+<button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" aria-label="Toggle navigation menu" aria-controls="sidebar"><i class="fas fa-bars" aria-hidden="true"></i></button>
+<div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>
+<nav class="sidebar" id="sidebar" aria-label="Main navigation">
   <div class="sidebar-header">
     <i class="fas fa-chart-line logo"></i>
     <div>
@@ -32,7 +34,7 @@
       <div class="app-sub" style="display:flex;align-items:center;gap:6px;margin-top:2px">
         <span style="font-size:10px">Research Platform</span>
         <label class="switch-sm" title="Toggle India/US market">
-          <input type="checkbox" id="marketToggle" onchange="toggleMarket()">
+          <input type="checkbox" id="marketToggle" onchange="toggleMarket()" aria-label="Switch between India and US markets">
           <span class="slider-sm"></span>
         </label>
         <span id="marketLabel" style="font-size:10px;font-weight:600;color:var(--accent)">India</span>
@@ -62,8 +64,8 @@
 <div class="main-content">
   <div class="top-bar">
     <div class="search-box">
-      <i class="fas fa-search"></i>
-      <input type="text" id="stockSearch" placeholder="Search Indian stock (e.g., RELIANCE, TCS)" onkeydown="if(event.key==='Enter') searchStock()">
+      <i class="fas fa-search" aria-hidden="true"></i>
+      <input type="text" id="stockSearch" aria-label="Stock symbol search" placeholder="Search Indian stock (e.g., RELIANCE, TCS)" onkeydown="if(event.key==='Enter') searchStock()">
       <span id="autoDetectLabel" style="font-size:11px;color:var(--text-muted);white-space:nowrap">NSE/BSE Auto-detect</span>
     </div>
     <div class="period-selector">
@@ -77,16 +79,16 @@
     <button class="btn btn-primary" onclick="searchStock()"><i class="fas fa-play"></i> Analyze</button>
     <button class="btn btn-success" onclick="generateFullReport()"><i class="fas fa-file-pdf"></i> Full Report</button>
     <button class="btn btn-outline" onclick="downloadReport()"><i class="fas fa-download"></i> PDF</button>
-    <div id="statusBar" style="font-size:12px;color:var(--text-muted);display:none;padding:4px 8px;background:var(--bg-card);border-radius:6px;border:1px solid var(--border);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+    <div id="statusBar" role="status" aria-live="polite" style="font-size:12px;color:var(--text-muted);display:none;padding:4px 8px;background:var(--bg-card);border-radius:6px;border:1px solid var(--border);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
     <label class="switch" style="margin-left:4px" title="Toggle Dark/Cream mode">
-      <input type="checkbox" id="themeToggle" onchange="toggleTheme()">
+      <input type="checkbox" id="themeToggle" onchange="toggleTheme()" aria-label="Toggle dark mode">
       <span class="slider"></span>
     </label>
     <span style="font-size:12px;color:var(--text-muted);white-space:nowrap" id="themeLabel">☀️</span>
   </div>
 
-  <div class="content-area">
-    <div class="loader" id="loader"><i class="fas fa-spinner"></i><p>Fetching stock data from Yahoo Finance...</p></div>
+  <div class="content-area" id="mainContent" role="main">
+    <div class="loader" id="loader" role="status" aria-live="polite"><i class="fas fa-spinner" aria-hidden="true"></i><p>Fetching stock data from Yahoo Finance...</p></div>
 
     <!-- DASHBOARD -->
     <div class="page active" id="page-dashboard">

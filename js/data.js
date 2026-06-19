@@ -6,12 +6,15 @@
 // ============================================================
 function showPage(pageId) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => { n.classList.remove('active'); n.removeAttribute('aria-current'); });
   const page = document.getElementById('page-' + pageId);
   if (page) page.classList.add('active');
   const navBtn = document.querySelector(`.nav-item[onclick*="'${pageId}'"]`);
-  if (navBtn) navBtn.classList.add('active');
+  if (navBtn) { navBtn.classList.add('active'); navBtn.setAttribute('aria-current', 'page'); }
   state.currentPage = pageId;
+  // Close the mobile sidebar after navigating.
+  document.getElementById('sidebar')?.classList.remove('open');
+  document.getElementById('sidebarBackdrop')?.classList.remove('open');
   if (pageId === 'watchlist') { renderWatchlist(); renderSentAlerts(); }
 }
 
@@ -173,7 +176,9 @@ async function fetchFundamentals(symbol) {
 }
 
 function toggleSidebar() {
-  document.getElementById('sidebar').classList.toggle('open');
+  const open = document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebarBackdrop')?.classList.toggle('open', open);
+  document.getElementById('sidebarToggle')?.setAttribute('aria-expanded', String(open));
 }
 
 function toggleMarket() {

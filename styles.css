@@ -406,11 +406,67 @@ h1, h2, h3, h4, .app-name, .verdict-value, .page-header h1 {
 
 /* Tabular numerals in any rendered table */
 table td, table th { font-variant-numeric: tabular-nums; }
+/* Wrap wide rendered tables so they scroll instead of breaking layout on mobile. */
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* ---------- Accessibility ---------- */
+.skip-link {
+  position: fixed; left: 12px; top: -48px; z-index: 9999;
+  background: var(--accent); color: #fff; padding: 9px 16px; border-radius: 9px;
+  font-size: 13px; font-weight: 600; text-decoration: none; transition: top .18s ease;
+}
+.skip-link:focus { top: 12px; outline: none; box-shadow: var(--shadow-lg); }
+
+/* Visible keyboard focus everywhere (mouse clicks stay clean via :focus-visible). */
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible,
+.nav-item:focus-visible, .tab-item:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.switch input:focus-visible + .slider, .switch-sm input:focus-visible + .slider-sm { box-shadow: var(--ring); }
+
+/* Mobile sidebar backdrop */
+.sidebar-backdrop { display: none; }
+
+/* Skeleton shimmer for loading states */
+.skeleton {
+  position: relative; overflow: hidden;
+  background: var(--bg-secondary); border-radius: var(--radius-sm); min-height: 16px;
+}
+.skeleton::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--bg-card) 70%, transparent), transparent);
+  transform: translateX(-100%); animation: shimmer 1.4s infinite;
+}
+@keyframes shimmer { to { transform: translateX(100%); } }
+
+/* Respect users who prefer reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------- Print (clean PDF capture) ---------- */
+@media print {
+  body { background: #fff; color: #000; }
+  body::before { display: none; }
+  .sidebar, .sidebar-toggle, .top-bar, .sidebar-backdrop, .skip-link { display: none !important; }
+  .main-content { margin-left: 0; }
+  .content-area { padding: 0; max-width: none; }
+  .card { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
+  .page { display: block !important; }
+}
 
 /* ---------- Responsive ---------- */
 @media (max-width: 768px) {
   .sidebar { width: 0; overflow: hidden; border-right: none; }
   .sidebar.open { width: 248px; overflow-y: auto; box-shadow: var(--shadow-lg); }
+  .sidebar-backdrop.open { display: block; position: fixed; inset: 0; z-index: 99; background: rgba(20, 14, 6, 0.45); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
   .sidebar-toggle { display: block; }
   .main-content { margin-left: 0; }
   .grid-2, .grid-3 { grid-template-columns: 1fr; }
