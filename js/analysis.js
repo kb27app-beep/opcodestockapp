@@ -104,12 +104,12 @@ function renderFullAnalysis(d) {
           <li>Favorable demographic dividend with rising per capita income</li>
         </ul>
         <br>
-        <h4>Financial Health:</h4>
+        <h4>Financial Health: ${d.fundamentalsReal ? '<span class="badge badge-green" style="font-size:9px">LIVE</span>' : '<span class="badge badge-yellow" style="font-size:9px">ESTIMATED</span>'}</h4>
         <ul>
-          <li><strong>Revenue Growth:</strong> Strong CAGR of ~12-15% over the last 5 years</li>
-          <li><strong>Operating Margins:</strong> ${d.sector === 'IT' ? '24-28%' : d.sector === 'BANKING' ? '35-40% (NIM)' : d.sector === 'FMCG' ? '20-25%' : '14-18%'} — healthy for the sector</li>
-          <li><strong>Debt Levels:</strong> ${d.sector === 'BANKING' || d.sector === 'TELECOM' ? 'Moderate leverage typical for the sector' : 'Comfortable debt-to-equity ratio below 0.5'}</li>
-          <li><strong>Cash Flow:</strong> Strong operating cash flow generation with healthy free cash flow conversion</li>
+          <li><strong>Revenue:</strong> ${d.fundamentalsReal && d.totalRevenue != null ? fmtBigCur(d.totalRevenue) + ' TTM' : '~' + fmtMcap(d.marketCap * 0.3) + ' (est.)'}${d.fundamentalsReal && d.revenueGrowth != null ? `, growing <strong>${(d.revenueGrowth*100).toFixed(1)}%</strong> YoY` : ', est. 12-15% CAGR'}</li>
+          <li><strong>Operating Margin:</strong> ${d.fundamentalsReal && d.operatingMargin != null ? `<strong>${(d.operatingMargin*100).toFixed(1)}%</strong>` : (d.sector === 'IT' ? '24-28%' : d.sector === 'BANKING' ? '35-40% (NIM)' : d.sector === 'FMCG' ? '20-25%' : '14-18%') + ' (est.)'}</li>
+          <li><strong>Return on Equity:</strong> ${d.fundamentalsReal && d.roe != null ? `<strong>${(d.roe*100).toFixed(1)}%</strong> — ${d.roe*100 > 15 ? 'strong' : 'adequate'}` : 'estimated 12-18% for the sector'}</li>
+          <li><strong>Debt / Equity:</strong> ${d.fundamentalsReal && d.debtToEquity != null ? `<strong>${(d.debtToEquity/100).toFixed(2)}</strong> — ${d.debtToEquity/100 < 1 ? 'low leverage' : 'moderate leverage'}` : (d.sector === 'BANKING' || d.sector === 'TELECOM' ? 'moderate leverage typical for the sector' : 'estimated below 0.5') + ' (est.)'}</li>
         </ul>
         <br>
         <h4>Promoter Holding & FII/DII Trends:</h4>
@@ -163,9 +163,23 @@ function renderFinancialBreakdown(d) {
     });
   }
 
-  // Stats grid
+  // Stats grid — prefer REAL fundamentals (TTM) when available; mark synthetic ones (est.).
   const statsEl = document.getElementById('finStats');
   const latest = finData[finData.length - 1];
+  const real = d.fundamentalsReal;
+  const est = real ? '' : ' <span style="font-size:10px;color:var(--text-muted);font-style:italic">(est.)</span>';
+  const estUnless = (cond) => cond ? '' : ' <span style="font-size:10px;color:var(--text-muted);font-style:italic">(est.)</span>';
+
+  const rROE = (real && d.roe != null) ? d.roe * 100 : latest.roe;
+  const rOpMargin = (real && d.operatingMargin != null) ? d.operatingMargin * 100 : latest.opMargin * 100;
+  const rProfitMargin = (real && d.profitMargin != null) ? d.profitMargin * 100 : null;
+  const rDE = (real && d.debtToEquity != null) ? d.debtToEquity / 100 : latest.debt / Math.max(latest.equity, 1);
+  const rRevenue = (real && d.totalRevenue != null) ? fmtBigCur(d.totalRevenue) : `${curSym()}${latest.rev.toFixed(0)}${curLabel()}`;
+  const rFCF = (real && d.freeCashflow != null) ? fmtBigCur(d.freeCashflow) : `${curSym()}${latest.fcf.toFixed(0)}${curLabel()}`;
+  const haveRealROE = real && d.roe != null, haveRealOM = real && d.operatingMargin != null;
+  const haveRealDE = real && d.debtToEquity != null, haveRealRev = real && d.totalRevenue != null;
+  const haveRealFCF = real && d.freeCashflow != null;
+
   statsEl.innerHTML = `
     <div class="stat-card" style="border-color:var(--accent)">
       <div class="label">Current Price (LTP)</div>
@@ -174,27 +188,22 @@ function renderFinancialBreakdown(d) {
         ${d.change >= 0 ? '+' : ''}${d.change.toFixed(2)} (${d.changePercent.toFixed(2)}%)
       </div>
     </div>
-    <div class="stat-card ${latest.fcf > latest.pat * 0.8 ? 'text-green' : 'text-red'}">
-      <div class="label">Free Cash Flow</div>
-      <div class="value">${curSym()}${latest.fcf.toFixed(0)}${curLabel()}</div>
-      <div class="change ${latest.fcf > latest.pat * 0.8 ? 'text-green' : 'text-red'}">
-        ${latest.fcf > latest.pat * 0.8 ? '✓ Above 80% (Healthy)' : '✗ Below 80% (Weak)'}
-      </div>
+    <div class="stat-card">
+      <div class="label">Free Cash Flow${estUnless(haveRealFCF)}</div>
+      <div class="value">${rFCF}</div>
     </div>
-    <div class="stat-card ${latest.roe > 15 ? 'text-green' : latest.roe > 10 ? 'text-yellow' : 'text-red'}">
-      <div class="label">ROE</div><div class="value">${latest.roe.toFixed(1)}%</div>
+    <div class="stat-card ${rROE > 15 ? 'text-green' : rROE > 10 ? 'text-yellow' : 'text-red'}">
+      <div class="label">ROE${estUnless(haveRealROE)}</div><div class="value">${rROE.toFixed(1)}%</div>
     </div>
-    <div class="stat-card ${latest.roce > 15 ? 'text-green' : latest.roce > 10 ? 'text-yellow' : 'text-red'}">
-      <div class="label">ROCE</div><div class="value">${latest.roce.toFixed(1)}%</div>
+    ${rProfitMargin != null ? `<div class="stat-card"><div class="label">Profit Margin</div><div class="value">${rProfitMargin.toFixed(1)}%</div></div>` : `<div class="stat-card ${latest.roce > 15 ? 'text-green' : 'text-yellow'}"><div class="label">ROCE (est.)</div><div class="value">${latest.roce.toFixed(1)}%</div></div>`}
+    <div class="stat-card">
+      <div class="label">Op. Margin${estUnless(haveRealOM)}</div><div class="value">${rOpMargin.toFixed(1)}%</div>
+    </div>
+    <div class="stat-card ${rDE > 1 ? 'text-red' : 'text-green'}">
+      <div class="label">D/E Ratio${estUnless(haveRealDE)}</div><div class="value">${rDE.toFixed(2)}</div>
     </div>
     <div class="stat-card">
-      <div class="label">Op. Margin</div><div class="value">${(latest.opMargin*100).toFixed(1)}%</div>
-    </div>
-    <div class="stat-card ${latest.debt > latest.equity ? 'text-red' : 'text-green'}">
-      <div class="label">D/E Ratio</div><div class="value">${(latest.debt/Math.max(latest.equity,1)).toFixed(2)}</div>
-    </div>
-    <div class="stat-card">
-      <div class="label">Revenue (TTM)</div><div class="value">${curSym()}${latest.rev.toFixed(0)}${curLabel()}</div>
+      <div class="label">Revenue (TTM)${estUnless(haveRealRev)}</div><div class="value">${rRevenue}</div>
     </div>
   `;
 
@@ -247,26 +256,30 @@ function renderFinancialBreakdown(d) {
     }
   }, 100);
 
-  // Analysis text
+  // Analysis text — uses real revenue growth / margins / ROE / D/E when available.
   const analysisEl = document.getElementById('financialAnalysisContent');
-  const revenueGrowth = ((finData[finData.length-1].rev - finData[0].rev) / finData[0].rev * 100).toFixed(1);
-  const patGrowth = ((finData[finData.length-1].pat - finData[0].pat) / finData[0].pat * 100).toFixed(1);
+  const synthRevGrowth = ((finData[finData.length-1].rev - finData[0].rev) / finData[0].rev * 100).toFixed(1);
+  const revGrowthPct = (real && d.revenueGrowth != null) ? (d.revenueGrowth * 100).toFixed(1) : synthRevGrowth;
+  const earnGrowthPct = (real && d.earningsGrowth != null) ? (d.earningsGrowth * 100).toFixed(1) : null;
+  const sourceNote = real
+    ? '<p style="font-size:12px;color:var(--text-muted)"><i class="fas fa-circle-check" style="color:var(--success)"></i> Current metrics below are live from Yahoo Finance (TTM). The multi-year trend chart above is modeled for illustration.</p>'
+    : '<p style="font-size:12px;color:var(--text-muted)"><i class="fas fa-triangle-exclamation"></i> Live fundamentals unavailable — figures below are estimated from price and sector.</p>';
   analysisEl.innerHTML = `
     <div class="card fade-in">
       <h3>Financial Health Assessment</h3>
-      <p><strong>Revenue Growth:</strong> ${d.fullName} has grown revenue by <strong>${revenueGrowth}%</strong> over the last 5 years, with a CAGR of approximately <strong>${(Math.pow(finData[finData.length-1].rev/finData[0].rev, 1/5)-1)*100 > 0 ? ((Math.pow(finData[finData.length-1].rev/finData[0].rev, 1/5)-1)*100).toFixed(2) : 0}%</strong>.</p>
+      ${sourceNote}
       <br>
-      <p><strong>PAT Growth:</strong> Net profit has grown <strong>${patGrowth}%</strong> over the same period, indicating ${Number(patGrowth) > Number(revenueGrowth) ? 'improving operating leverage and margin expansion' : 'margin pressure despite revenue growth'}.</p>
+      <p><strong>Revenue Growth:</strong> ${d.fullName} ${real && d.revenueGrowth != null ? 'grew revenue' : 'is modeled to have grown revenue'} by <strong>${revGrowthPct}%</strong>${real && d.revenueGrowth != null ? ' year-on-year (TTM)' : ' over the modeled period'}.${earnGrowthPct != null ? ` Earnings growth: <strong>${earnGrowthPct}%</strong> YoY.` : ''}</p>
       <br>
-      <p><strong>Free Cash Flow:</strong> At ${curSym()}${latest.fcf.toFixed(0)}${curLabel()}, FCF is <strong>${(latest.fcf/latest.pat*100).toFixed(1)}%</strong> of PAT — ${latest.fcf > latest.pat * 0.8 ? '<span class="text-green">above the 80% threshold, indicating healthy cash flow generation.</span>' : '<span class="text-red">below the 80% threshold, which warrants monitoring of working capital management.</span>'}</p>
+      <p><strong>Free Cash Flow:</strong> ${rFCF}${haveRealFCF ? ' (TTM)' : ' (est.)'} — ${(real && d.freeCashflow > 0) || (!real && latest.fcf > 0) ? '<span class="text-green">positive cash generation.</span>' : '<span class="text-red">negative free cash flow, worth monitoring.</span>'}</p>
       <br>
-      <p><strong>Operating Margins:</strong> ${(latest.opMargin*100).toFixed(1)}% — ${latest.opMargin > 0.2 ? 'Healthy margins with pricing power' : 'Moderate margins with room for improvement'}.</p>
+      <p><strong>Operating Margin:</strong> ${rOpMargin.toFixed(1)}%${estUnless(haveRealOM)} — ${rOpMargin > 20 ? 'healthy margins with pricing power' : 'moderate margins with room for improvement'}.${rProfitMargin != null ? ` Net profit margin: <strong>${rProfitMargin.toFixed(1)}%</strong>.` : ''}</p>
       <br>
-      <p><strong>Debt Levels:</strong> D/E ratio of ${(latest.debt/Math.max(latest.equity,1)).toFixed(2)} — ${latest.debt < latest.equity ? 'low leverage, strong balance sheet.' : 'moderate leverage, manageable.'}</p>
+      <p><strong>Debt Levels:</strong> D/E ratio of ${rDE.toFixed(2)}${estUnless(haveRealDE)} — ${rDE < 1 ? 'low leverage, strong balance sheet.' : 'moderate-to-high leverage, manageable but worth watching.'}</p>
       <br>
-      <p><strong>ROE & ROCE:</strong> ROE of ${latest.roe.toFixed(1)}% and ROCE of ${latest.roce.toFixed(1)}% indicate ${latest.roe > 15 ? 'strong' : 'adequate'} return generation on capital employed.</p>
+      <p><strong>Return on Equity:</strong> ROE of ${rROE.toFixed(1)}%${estUnless(haveRealROE)} indicates ${rROE > 15 ? 'strong' : rROE > 10 ? 'adequate' : 'weak'} return generation.</p>
       <br>
-      <p><strong>Verdict:</strong> The company appears to be <strong>${latest.roe > 15 && latest.fcf > latest.pat * 0.8 ? 'financially strengthening' : 'financially stable but with areas of improvement'}</strong>.</p>
+      <p><strong>Verdict:</strong> ${d.fullName} appears <strong>${rROE > 15 && rDE < 1 ? 'financially strong' : rROE > 10 ? 'financially stable' : 'financially mixed, with areas to watch'}</strong>${real ? '' : ' (based on estimates)'}.</p>
     </div>
   `;
 }
@@ -324,18 +337,27 @@ function renderMoatAnalysis(d) {
 // ============================================================
 function renderValuationAnalysis(d) {
   const statsEl = document.getElementById('valuationStats');
-  const eps = d.currentPrice / Math.max(d.pe, 0.1);
-  const ev = d.marketCap * 1.1; // rough EV
-  const ebitda = d.marketCap * 0.15;
-  const evEbitda = ev / Math.max(ebitda, 1);
+  const real = d.fundamentalsReal;
+  const estIf = (have) => have ? '' : ' <span style="font-size:10px;color:var(--text-muted);font-style:italic">(est.)</span>';
+  const eps = (real && d.eps != null) ? d.eps : d.currentPrice / Math.max(d.pe, 0.1);
+  const haveEps = real && d.eps != null;
+  const peLabel = d.peEstimated ? estIf(false) : '';
+
+  // Build the extra cards only when Yahoo gave us the real figure.
+  const extraCards = [
+    (real && d.forwardPE != null) ? `<div class="stat-card"><div class="label">Forward P/E</div><div class="value">${d.forwardPE.toFixed(1)}x</div></div>` : '',
+    (real && d.priceToBook != null) ? `<div class="stat-card"><div class="label">Price / Book</div><div class="value">${d.priceToBook.toFixed(2)}x</div></div>` : '',
+    (real && d.beta != null) ? `<div class="stat-card"><div class="label">Beta</div><div class="value">${d.beta.toFixed(2)}</div></div>` : '',
+    (real && d.dividendYield != null && d.dividendYield > 0) ? `<div class="stat-card"><div class="label">Dividend Yield</div><div class="value">${(d.dividendYield*100).toFixed(2)}%</div></div>` : '',
+  ].join('');
 
   statsEl.innerHTML = `
-    <div class="stat-card"><div class="label">Current P/E</div><div class="value">${d.pe.toFixed(1)}x</div></div>
-    <div class="stat-card"><div class="label">Sector P/E</div><div class="value">${d.sectorPE}x</div></div>
+    <div class="stat-card"><div class="label">Current P/E${peLabel}</div><div class="value">${d.pe.toFixed(1)}x</div></div>
+    <div class="stat-card"><div class="label">Sector P/E (est.)</div><div class="value">${d.sectorPE}x</div></div>
     <div class="stat-card ${d.pe < d.sectorPE ? 'text-green' : 'text-red'}"><div class="label">Premium/Discount</div><div class="value">${((d.pe - d.sectorPE)/d.sectorPE*100).toFixed(0)}%</div></div>
-    <div class="stat-card"><div class="label">Est. EPS</div><div class="value">${curSym()}${eps.toFixed(2)}</div></div>
-    <div class="stat-card"><div class="label">EV/EBITDA (Est.)</div><div class="value">${evEbitda.toFixed(1)}x</div></div>
-    <div class="stat-card"><div class="label">Market Cap</div><div class="value">${fmtMcap(d.marketCap)}</div></div>
+    <div class="stat-card"><div class="label">EPS${estIf(haveEps)}</div><div class="value">${curSym()}${eps.toFixed(2)}</div></div>
+    ${extraCards}
+    <div class="stat-card"><div class="label">Market Cap${estIf(!d.marketCapEstimated)}</div><div class="value">${fmtMcap(d.marketCap)}</div></div>
   `;
 
   // PE comparison chart

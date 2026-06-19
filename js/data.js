@@ -324,6 +324,12 @@ function extractAnalysisData(sd) {
   const peEstimated = !extra.pe;
   const marketCapEstimated = !extra.marketCap;
 
+  // Real fundamentals from /yf-fundamentals (Yahoo quoteSummary), when available.
+  // These are genuine TTM/current figures — the analysis modules use them in place of
+  // sector-guess templates and mark anything still synthetic with (est.).
+  const f = state._fundamentals || {};
+  const fundamentalsReal = f.source === 'yahoo-quoteSummary';
+
   return {
     name,
     fullName,
@@ -348,6 +354,24 @@ function extractAnalysisData(sd) {
     peEstimated,
     marketCapEstimated,
     peers,
+    industry: f.industry || null,
+    // Real fundamentals (null when not available -> modules fall back to estimates).
+    fundamentalsReal,
+    roe: f.returnOnEquity,
+    profitMargin: f.profitMargins,
+    operatingMargin: f.operatingMargins,
+    totalRevenue: f.totalRevenue,
+    revenueGrowth: f.revenueGrowth,
+    earningsGrowth: f.earningsGrowth,
+    debtToEquity: f.debtToEquity,
+    eps: f.eps,
+    beta: f.beta,
+    dividendYield: f.dividendYield,
+    priceToBook: f.priceToBook,
+    forwardPE: f.forwardPE,
+    freeCashflow: f.freeCashflow,
+    totalCash: f.totalCash,
+    totalDebt: f.totalDebt,
     yearlyData,
     closes,
     timestamps,
@@ -355,6 +379,15 @@ function extractAnalysisData(sd) {
     highs,
     lows
   };
+}
+
+// Shared formatters for real fundamentals (used across the analysis modules).
+// Yahoo gives ratios as fractions (0.0914 = 9.14%) and debtToEquity as a percent (36.6 = 36.6%).
+function fmtPct(v, digits) { return (v === null || v === undefined || isNaN(v)) ? null : (v * 100).toFixed(digits == null ? 1 : digits) + '%'; }
+function fmtRatio(v) { return (v === null || v === undefined || isNaN(v)) ? null : v.toFixed(2); }
+function fmtBigCur(v) {
+  if (v === null || v === undefined || isNaN(v)) return null;
+  return state.market === 'US' ? '$' + (v / 1e9).toFixed(1) + 'B' : '₹' + Math.round(v / 1e7).toLocaleString('en-IN') + ' Cr';
 }
 
 function guessSector(name) {
