@@ -365,6 +365,30 @@ function deleteSentAlert(id) {
   renderSentAlerts();
 }
 
+let _wlSort = { col: null, dir: 1 };
+const _wlAlerted = new Set();   // de-dupe target/stop alerts within a session
+
+function sortWatchlist(col) {
+  if (_wlSort.col === col) _wlSort.dir *= -1; else { _wlSort.col = col; _wlSort.dir = 1; }
+  renderWatchlist();
+}
+
+// Evaluate target / stop-loss rules against a freshly fetched price and log a single
+// alert per crossing (deduped) so the watchlist actually fires, not just configures.
+function evaluateWatchlistAlerts(item) {
+  const price = item._price;
+  if (typeof price !== 'number') return;
+  const sym = item.symbol;
+  if (item.alert_target && item.target_price && price >= item.target_price) {
+    const key = sym + ':target';
+    if (!_wlAlerted.has(key)) { _wlAlerted.add(key); try { logSentAlert(sym, 'live', `≥ ${item.target_price}`, ['watchlist'], `${sym} hit target ${item.target_price} (now ${price.toFixed(2)})`); } catch (_) {} }
+  }
+  if (item.alert_stoploss && item.stop_loss && price <= item.stop_loss) {
+    const key = sym + ':stop';
+    if (!_wlAlerted.has(key)) { _wlAlerted.add(key); try { logSentAlert(sym, 'live', `≤ ${item.stop_loss}`, ['watchlist'], `${sym} hit stop-loss ${item.stop_loss} (now ${price.toFixed(2)})`); } catch (_) {} }
+  }
+}
+
 async function refreshWatchlist() {
   const items = getWatchlist();
   if (!items.length) return;
@@ -376,10 +400,11 @@ async function refreshWatchlist() {
       const r = data?.chart?.result?.[0];
       if (r) {
         item._price = r.meta?.regularMarketPrice;
-        item._prevClose = r.meta?.previousClose;
+        item._prevClose = r.meta?.chartPreviousClose ?? r.meta?.previousClose;
         const quote = r.indicators?.quote?.[0];
         item._dayHigh = r.meta?.regularMarketDayHigh || quote?.high?.[quote.high.length-1];
         item._dayLow = r.meta?.regularMarketDayLow || quote?.low?.[quote.low.length-1];
+        evaluateWatchlistAlerts(item);
       }
     } catch (_) {}
   }
@@ -401,6 +426,21 @@ function renderWatchlist(items) {
 
   empty.style.display = 'none';
   container.style.display = 'block';
+
+  // Apply the active column sort (computing a status % for the Status column).
+  if (_wlSort.col) {
+    const key = _wlSort.col, dir = _wlSort.dir;
+    const val = (it) => {
+      if (key === '_statusPct') return (it.target_price && typeof it._price === 'number') ? (it._price / it.target_price) : -Infinity;
+      const v = it[key];
+      return v == null ? (typeof v === 'string' ? '' : -Infinity) : v;
+    };
+    items = [...items].sort((a, b) => {
+      const va = val(a), vb = val(b);
+      if (typeof va === 'string' || typeof vb === 'string') return String(va).localeCompare(String(vb)) * dir;
+      return (va - vb) * dir;
+    });
+  }
 
   tbody.innerHTML = items.map(item => {
     const price = item._price || '—';

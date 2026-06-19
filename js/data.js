@@ -151,6 +151,58 @@ async function searchStock() {
   }
 }
 
+// ---- Search autocomplete (typeahead via /yf-search) ----
+let _acTimer = null, _acItems = [], _acIndex = -1;
+function searchAutocomplete(q) {
+  q = (q || '').trim();
+  const box = document.getElementById('searchSuggest');
+  if (!box) return;
+  if (q.length < 2) { closeSuggest(); return; }
+  clearTimeout(_acTimer);
+  _acTimer = setTimeout(async () => {
+    try {
+      const proxy = localServer || window.location.origin;
+      const resp = await fetch(`${proxy}/yf-search?q=${encodeURIComponent(q)}`);
+      if (!resp.ok) return;
+      const j = await resp.json();
+      const quotes = (j.quotes || []).filter(x => x.symbol && (!x.quoteType || x.quoteType === 'EQUITY')).slice(0, 8);
+      _acItems = quotes; _acIndex = -1;
+      if (!quotes.length) { closeSuggest(); return; }
+      const esc = s => String(s || '').replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+      box.innerHTML = quotes.map((x, i) => `<button type="button" class="suggest-item" role="option" onmousedown="event.preventDefault()" onclick="selectSuggestion(${i})">
+        <span class="suggest-sym">${esc(x.symbol)}</span>
+        <span class="suggest-name">${esc(x.shortname || x.longname || '')}</span>
+        <span class="suggest-ex">${esc(x.exchDisp || x.exchange || '')}</span></button>`).join('');
+      box.classList.add('open');
+      document.getElementById('stockSearch')?.setAttribute('aria-expanded', 'true');
+    } catch (_) {}
+  }, 220);
+}
+function selectSuggestion(i) {
+  const x = _acItems[i];
+  if (!x) return;
+  document.getElementById('stockSearch').value = x.symbol;
+  closeSuggest();
+  searchStock();
+}
+function closeSuggest() {
+  const b = document.getElementById('searchSuggest');
+  if (b) { b.classList.remove('open'); b.innerHTML = ''; }
+  document.getElementById('stockSearch')?.setAttribute('aria-expanded', 'false');
+}
+function highlightSuggest() {
+  document.querySelectorAll('#searchSuggest .suggest-item').forEach((el, i) => el.classList.toggle('active', i === _acIndex));
+}
+function searchKeydown(e) {
+  const box = document.getElementById('searchSuggest');
+  const open = box && box.classList.contains('open');
+  if (e.key === 'Enter') { if (open && _acIndex >= 0) selectSuggestion(_acIndex); else searchStock(); return; }
+  if (!open) return;
+  if (e.key === 'ArrowDown') { e.preventDefault(); _acIndex = Math.min(_acIndex + 1, _acItems.length - 1); highlightSuggest(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); _acIndex = Math.max(_acIndex - 1, 0); highlightSuggest(); }
+  else if (e.key === 'Escape') { closeSuggest(); }
+}
+
 // Pull real fundamentals from the local server's /yf-fundamentals endpoint (Yahoo
 // quoteSummary via automated browser). On any failure, clears _extraData so the app
 // falls back to its hardcoded estimates and the (est.) markers stay visible.

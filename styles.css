@@ -218,7 +218,26 @@ h1, h2, h3, h4, .app-name, .verdict-value, .page-header h1 {
   gap: 10px;
   transition: border-color .18s ease, box-shadow .18s ease;
 }
+.search-box { position: relative; }
 .search-box:focus-within { border-color: var(--accent); box-shadow: var(--ring); }
+/* Typeahead suggestions */
+.search-suggest {
+  display: none; position: absolute; left: 0; right: 0; top: calc(100% + 8px);
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 11px;
+  box-shadow: var(--shadow-lg); padding: 5px; z-index: 60; max-height: 360px; overflow-y: auto;
+}
+.search-suggest.open { display: block; }
+.suggest-item {
+  display: flex; align-items: baseline; gap: 10px; width: 100%; text-align: left;
+  padding: 9px 11px; border: none; background: none; border-radius: 8px; cursor: pointer;
+  font-family: inherit; color: var(--text-primary); transition: background .12s;
+}
+.suggest-item:hover, .suggest-item.active { background: var(--accent-soft); }
+.suggest-sym { font-family: var(--font-mono); font-weight: 600; font-size: 13px; color: var(--accent); min-width: 64px; }
+.suggest-name { flex: 1; font-size: 13px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.suggest-ex { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; }
+.wl-sort { user-select: none; transition: color .15s; }
+.wl-sort:hover { color: var(--accent); }
 .search-box i { color: var(--text-muted); font-size: 14px; }
 .search-box input {
   flex: 1; background: none; border: none; outline: none;

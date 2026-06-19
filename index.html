@@ -65,8 +65,11 @@
   <div class="top-bar">
     <div class="search-box">
       <i class="fas fa-search" aria-hidden="true"></i>
-      <input type="text" id="stockSearch" aria-label="Stock symbol search" placeholder="Search Indian stock (e.g., RELIANCE, TCS)" onkeydown="if(event.key==='Enter') searchStock()">
+      <input type="text" id="stockSearch" aria-label="Stock symbol search" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="searchSuggest"
+             placeholder="Search Indian stock (e.g., RELIANCE, TCS)"
+             oninput="searchAutocomplete(this.value)" onkeydown="searchKeydown(event)" onblur="setTimeout(closeSuggest,150)">
       <span id="autoDetectLabel" style="font-size:11px;color:var(--text-muted);white-space:nowrap">NSE/BSE Auto-detect</span>
+      <div id="searchSuggest" class="search-suggest" role="listbox" aria-label="Search suggestions"></div>
     </div>
     <div class="period-selector">
       <select id="periodSelect">
@@ -249,15 +252,15 @@
         <div id="wlTableContainer" style="display:none;overflow-x:auto">
           <table style="width:100%;border-collapse:collapse;font-size:13px">
             <thead><tr style="color:var(--text-muted);border-bottom:1px solid var(--border)">
-              <th style="text-align:left;padding:10px 6px;font-size:11px">Date</th>
-              <th style="text-align:left;padding:10px 6px">Name</th>
-              <th style="text-align:left;padding:10px 6px">Ticker</th>
-              <th style="text-align:right;padding:10px 6px">Price</th>
+              <th class="wl-sort" onclick="sortWatchlist('added_on')" style="text-align:left;padding:10px 6px;font-size:11px;cursor:pointer">Date</th>
+              <th class="wl-sort" onclick="sortWatchlist('stock_name')" style="text-align:left;padding:10px 6px;cursor:pointer">Name</th>
+              <th class="wl-sort" onclick="sortWatchlist('symbol')" style="text-align:left;padding:10px 6px;cursor:pointer">Ticker</th>
+              <th class="wl-sort" onclick="sortWatchlist('_price')" style="text-align:right;padding:10px 6px;cursor:pointer">Price</th>
               <th style="text-align:right;padding:10px 6px;font-size:11px">Ind. PE</th>
               <th style="text-align:right;padding:10px 6px;font-size:11px">Stk PE</th>
-              <th style="text-align:right;padding:10px 6px">Target</th>
-              <th style="text-align:right;padding:10px 6px">Stop</th>
-              <th style="text-align:right;padding:10px 6px">Status</th>
+              <th class="wl-sort" onclick="sortWatchlist('target_price')" style="text-align:right;padding:10px 6px;cursor:pointer">Target</th>
+              <th class="wl-sort" onclick="sortWatchlist('stop_loss')" style="text-align:right;padding:10px 6px;cursor:pointer">Stop</th>
+              <th class="wl-sort" onclick="sortWatchlist('_statusPct')" style="text-align:right;padding:10px 6px;cursor:pointer">Status</th>
               <th style="text-align:left;padding:10px 6px">Notes</th>
               <th style="text-align:center;padding:10px 6px">Action</th>
             </tr></thead>
