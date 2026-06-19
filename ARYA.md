@@ -1,8 +1,9 @@
 # ARYA'S Stocks Pro — Comprehensive Application Summary
 
-**Project directory:** `C:\Users\BHUPENDRA PATEL\Downloads\OP CODE STOCK APP`
-**Main file:** `index.html` (~2,950 lines)
-**Supporting files:** `server.js`, `server.ps1`, `start.bat`
+**Main file:** `index.html` (~3,050 lines)
+**Supporting files:** `server.js`, `server.ps1`, `start.bat`, `package.json`
+
+**Run:** `npm install` then `npm start` (or `node server.js`), open http://localhost:3000
 
 ---
 
@@ -191,7 +192,7 @@ Database is base64-encoded and stored in `localStorage` (key `stockAppDb`), surv
 | `start.bat` | ~85 | Auto-launcher (Node > Python > PowerShell) |
 | `ARYA.md` | this | Documentation |
 
-All files are in `C:\Users\BHUPENDRA PATEL\Downloads\OP CODE STOCK APP\`. Fully self-contained — no `npm install` or `package.json` needed.
+The proxy depends on `nodemailer` (for SMTP email alerts), so run `npm install` once before `npm start`. The frontend itself is self-contained (all HTML/CSS/JS inline, libraries from CDN).
 
 ---
 
@@ -209,9 +210,48 @@ state = {
 
 ---
 
+## 8a. Changelog (v1.2.0)
+
+- **Real fundamentals are now LIVE** (market cap, P/E, sector, ROE, margins, revenue, debt).
+  `yahoo-auth.js` drives a headless system Chrome (via `playwright-core`) to clear Yahoo's
+  consent wall, obtain the A1/A3 cookies + crumb, and fetch `quoteSummary` from inside the
+  authenticated page — the only path that returns HTTP 200 for free. Results are cached per
+  symbol (10 min), the browser closes after 5 min idle, and any failure degrades to the
+  estimate-based fallback. Exposed via `server.js` `/yf-fundamentals?symbol=`. The dashboard
+  drops the `(est.)` marker whenever live data is present and the status bar says
+  "live fundamentals" vs "estimated fundamentals".
+- **Front-end split for maintainability**: the single `index.html` is now `index.html` (markup)
+  + `styles.css` + `app.js`, served as-is (no build step). Fixed a pre-existing bug where 9
+  unevaluated `${...}` template expressions in the static body rendered as literal text.
+- **Visual redesign ("editorial fintech terminal")**: Fraunces display serif + Spline Sans body
+  + JetBrains Mono for figures; warm-paper light theme and warm-ink dark theme; layered
+  background atmosphere + grain; refined cards/buttons/nav with micro-interactions; charts
+  recolored to the gold accent and theme-aware. Currency-correct market-cap formatting
+  (`₹ Cr` / `$ B`) and a Yahoo-sector → industry-P/E map for sensible comparisons.
+- Requires a local Chrome/Chromium for live fundamentals; without one the app still runs on
+  estimates. `npm install` now also pulls `playwright-core`.
+
+## 8b. Changelog (v1.1.0)
+
+- **Real-data field fixes**: the app now reads the correct Yahoo `chart` meta keys —
+  `longName`/`shortName` (real company name, previously always fell back to the ticker),
+  `chartPreviousClose` (correct day-change, previously silently zeroed), and
+  `fiftyTwoWeekHigh`/`Low` (real 52-week range instead of a slice of recent closes).
+- **Honesty labeling**: values Yahoo's free endpoint does not provide (market cap, P/E,
+  sector) now render with a `(est.)` marker so users aren't misled by fabricated precision.
+- **Security**: the generic `/proxy` endpoint in `server.js` is now restricted to an
+  allowlist of public finance hosts (closing an open-proxy / SSRF hole). `/yf` and
+  `/yf-search` were already Yahoo-only.
+- **Cleanup**: removed a duplicate `curLabel()` definition; added a real `package.json`
+  with `npm start`.
+- **Why fundamentals stay estimated**: Yahoo's richer `quoteSummary`/`v7/quote` endpoints
+  now require a crumb+cookie that the consent flow blocks for unauthenticated/free use,
+  so real market cap / P/E / financials are not freely reachable. A paid fundamentals
+  feed (or a working crumb flow) would be needed to make those live.
+
 ## 9. Limitations
 
-1. **No real financial data** — P/E, revenue, PAT, margins, ROE/ROCE, FCF are estimated using hardcoded values + random extrapolation from market cap
+1. **No real financial data** — P/E, revenue, PAT, margins, ROE/ROCE, FCF are estimated using hardcoded values + random extrapolation from market cap (now flagged `(est.)` in the UI)
 2. **Limited sector detection** — Hardcoded mapping for ~120 stocks; unknown stocks default to sector "DEFAULT" (PE 22x)
 3. **No real peer comparison** — Only ~15 stocks have explicit peer lists
 4. **No real institutional data** — FII/DII analysis is template text

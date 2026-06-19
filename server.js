@@ -19,6 +19,25 @@ const MIME = {
   '.wasm': 'application/wasm',
 };
 
+// SSRF guard: the generic /proxy endpoint may only reach a small allowlist of
+// public financial-data hosts. Without this, anyone on the LAN could use this
+// server to fetch internal/private URLs (cloud metadata, localhost services, etc.).
+const PROXY_ALLOWED_HOSTS = [
+  'query1.finance.yahoo.com',
+  'query2.finance.yahoo.com',
+  'finance.yahoo.com',
+  'stooq.com',
+  'stooq.pl',
+];
+
+function isProxyTargetAllowed(targetUrl) {
+  let u;
+  try { u = new URL(targetUrl); } catch (_) { return false; }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return false;
+  const host = u.hostname.toLowerCase();
+  return PROXY_ALLOWED_HOSTS.some(h => host === h || host.endsWith('.' + h));
+}
+
 async function fetchUrl(targetUrl) {
   const resp = await fetch(targetUrl, {
     headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
@@ -84,12 +103,38 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ---- REAL FUNDAMENTALS (Yahoo quoteSummary via automated browser) ----
+  // Returns real market cap, P/E, sector, margins, ROE, revenue, debt, etc.
+  // Lazily loads yahoo-auth (and a headless browser) on first use. Any failure
+  // degrades to HTTP 503 so the frontend keeps its estimate-based fallback.
+  if (url.pathname === '/yf-fundamentals') {
+    const symbol = url.searchParams.get('symbol');
+    if (!symbol) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ error: 'Missing symbol' }));
+    }
+    try {
+      const yahooAuth = require('./yahoo-auth');
+      const data = await yahooAuth.getFundamentals(symbol);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ symbol, data }));
+    } catch (e) {
+      const status = e && e.code === 429 ? 429 : 503;
+      res.writeHead(status, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ error: e.message, fundamentals: null }));
+    }
+  }
+
   // ---- GENERIC PROXY ----
   if (url.pathname === '/proxy') {
     const target = url.searchParams.get('url');
     if (!target) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ error: 'Missing url' }));
+    }
+    if (!isProxyTargetAllowed(target)) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ error: 'Target host not allowed' }));
     }
     try {
       const result = await fetchUrl(target);
