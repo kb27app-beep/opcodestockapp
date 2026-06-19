@@ -12,14 +12,18 @@
 // callers get null and the app falls back to its existing estimates.
 
 const { chromium } = require('playwright-core');
+const cache = require('./cache');
 
 const QUOTE_SUMMARY_MODULES = [
   'price', 'summaryDetail', 'defaultKeyStatistics', 'financialData', 'assetProfile',
 ].join(',');
 
 const CACHE_TTL_MS = 10 * 60 * 1000;     // fundamentals change slowly; 10 min is plenty
+const STALE_MAX_MS = 24 * 60 * 60 * 1000;// serve cached data up to a day old if Yahoo fails
 const IDLE_CLOSE_MS = 5 * 60 * 1000;     // free the browser after 5 min of no requests
+const MIN_INTERVAL_MS = 1500;            // min gap between Yahoo hits (429 avoidance)
 const NAV_TIMEOUT_MS = 30000;
+const SESSION_KEY = 'yahoo-session';     // persisted storageState (cookies) on disk
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
 let browser = null;
@@ -28,7 +32,21 @@ let page = null;
 let launching = null;          // in-flight launch promise (dedupes concurrent launches)
 let idleTimer = null;
 let lastError = null;
-const cache = new Map();        // symbol -> { ts, data }
+const memCache = new Map();     // symbol -> { ts, data } (hot, in-process)
+
+// Serialize Yahoo hits through a single queue with a minimum interval. Concurrent
+// /yf-fundamentals requests therefore can't stampede Yahoo into a 429.
+let queueTail = Promise.resolve();
+let lastHit = 0;
+function enqueue(fn) {
+  const run = queueTail.then(async () => {
+    const wait = MIN_INTERVAL_MS - (Date.now() - lastHit);
+    if (wait > 0) await new Promise(r => setTimeout(r, wait));
+    try { return await fn(); } finally { lastHit = Date.now(); }
+  });
+  queueTail = run.catch(() => {});
+  return run;
+}
 
 function scheduleIdleClose() {
   if (idleTimer) clearTimeout(idleTimer);
@@ -55,7 +73,11 @@ async function ensureSession() {
   if (launching) return launching;
   launching = (async () => {
     browser = await launchBrowser();
-    context = await browser.newContext({ locale: 'en-US', userAgent: UA });
+    // Reuse a previously saved session (cookies) so cold starts skip the consent dance.
+    const saved = cache.read(SESSION_KEY, null);
+    const ctxOpts = { locale: 'en-US', userAgent: UA };
+    if (saved && saved.data) ctxOpts.storageState = saved.data;
+    context = await browser.newContext(ctxOpts);
     page = await context.newPage();
     // Speed/robustness: we only need cookies + the ability to fetch JSON, not a rendered
     // page. Abort heavy subresources so navigation commits in well under the timeout.
@@ -73,7 +95,9 @@ async function ensureSession() {
     }
     await dismissConsent();
     // Poll until the crumb endpoint hands back a real token (cookies propagated).
-    await waitForCrumb();
+    const crumb = await waitForCrumb();
+    // Persist the authenticated cookies for the next cold start.
+    if (crumb) { try { cache.write(SESSION_KEY, await context.storageState()); } catch (_) {} }
   })();
   try { await launching; }
   finally { launching = null; }
@@ -162,37 +186,66 @@ function normalize(result) {
   };
 }
 
+const cacheKey = (s) => 'fund-' + s;
+
+// Read fresh cache (memory first, then disk). Returns data or null.
+function readFresh(symbol) {
+  const m = memCache.get(symbol);
+  if (m && Date.now() - m.ts < CACHE_TTL_MS) return m.data;
+  const d = cache.read(cacheKey(symbol), CACHE_TTL_MS);
+  if (d && d.fresh) { memCache.set(symbol, { ts: d.ts, data: d.data }); return d.data; }
+  return null;
+}
+
+// Read any cache entry up to STALE_MAX_MS old — last-resort fallback when Yahoo fails.
+function readStale(symbol) {
+  const m = memCache.get(symbol);
+  if (m && Date.now() - m.ts < STALE_MAX_MS) return m.data;
+  const d = cache.read(cacheKey(symbol), STALE_MAX_MS);
+  return d ? d.data : null;
+}
+
 async function getFundamentals(symbol) {
   if (!symbol) throw new Error('symbol required');
-  const cached = cache.get(symbol);
-  if (cached && Date.now() - cached.ts < CACHE_TTL_MS) return cached.data;
 
-  await ensureSession();
-  scheduleIdleClose();
+  const fresh = readFresh(symbol);
+  if (fresh) return fresh;
 
-  let resp;
-  try {
-    resp = await fetchSummaryInPage(symbol);
-  } catch (e) {
-    // Page may have died; rebuild once.
-    await close().catch(() => {});
-    await ensureSession();
-    resp = await fetchSummaryInPage(symbol);
-  }
+  // Single Yahoo hit per symbol, serialized through the rate-limit queue.
+  return enqueue(async () => {
+    // Re-check inside the queue: a concurrent request may have just filled the cache.
+    const again = readFresh(symbol);
+    if (again) return again;
 
-  if (resp.status === 429) {
-    lastError = 'rate-limited';
-    const err = new Error('Yahoo rate-limited (429)'); err.code = 429; throw err;
-  }
-  const result = resp.json && resp.json.quoteSummary && resp.json.quoteSummary.result && resp.json.quoteSummary.result[0];
-  if (resp.status !== 200 || !result) {
-    const err = new Error('quoteSummary failed: HTTP ' + resp.status); err.code = resp.status; throw err;
-  }
+    try {
+      await ensureSession();
+      scheduleIdleClose();
 
-  const data = normalize(result);
-  cache.set(symbol, { ts: Date.now(), data });
-  lastError = null;
-  return data;
+      let resp;
+      try {
+        resp = await fetchSummaryInPage(symbol);
+      } catch (e) {
+        await close().catch(() => {});   // page may have died; rebuild once
+        await ensureSession();
+        resp = await fetchSummaryInPage(symbol);
+      }
+
+      if (resp.status === 429) { lastError = 'rate-limited'; const e = new Error('Yahoo rate-limited (429)'); e.code = 429; throw e; }
+      const result = resp.json && resp.json.quoteSummary && resp.json.quoteSummary.result && resp.json.quoteSummary.result[0];
+      if (resp.status !== 200 || !result) { const e = new Error('quoteSummary failed: HTTP ' + resp.status); e.code = resp.status; throw e; }
+
+      const data = normalize(result);
+      memCache.set(symbol, { ts: Date.now(), data });
+      cache.write(cacheKey(symbol), data);
+      lastError = null;
+      return data;
+    } catch (err) {
+      // Degrade to stale cache rather than failing outright when possible.
+      const stale = readStale(symbol);
+      if (stale) { lastError = (err.message || 'error') + ' (served stale)'; return { ...stale, stale: true }; }
+      throw err;
+    }
+  });
 }
 
 async function close() {
@@ -202,4 +255,7 @@ async function close() {
   if (b) { try { await b.close(); } catch (_) {} }
 }
 
-module.exports = { getFundamentals, close, _state: () => ({ alive: !!page, cacheSize: cache.size, lastError }) };
+module.exports = {
+  getFundamentals, close,
+  _state: () => ({ alive: !!page, cacheSize: memCache.size, lastError, minIntervalMs: MIN_INTERVAL_MS }),
+};

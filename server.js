@@ -47,6 +47,34 @@ async function fetchUrl(targetUrl) {
   return { status: resp.status, contentType, text };
 }
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MAX_BODY_BYTES = 256 * 1024;            // reject oversized POST bodies
+
+// Lightweight per-IP throttle for the email endpoint (which sends real mail).
+const emailHits = new Map();                  // ip -> [timestamps]
+const EMAIL_WINDOW_MS = 60 * 1000, EMAIL_MAX = 5;
+function emailThrottled(ip) {
+  const now = Date.now();
+  const hits = (emailHits.get(ip) || []).filter(t => now - t < EMAIL_WINDOW_MS);
+  if (hits.length >= EMAIL_MAX) { emailHits.set(ip, hits); return true; }
+  hits.push(now); emailHits.set(ip, hits);
+  return false;
+}
+
+// Collect a POST body with a hard size cap.
+function readBody(req, limit = MAX_BODY_BYTES) {
+  return new Promise((resolve, reject) => {
+    let body = '', bytes = 0;
+    req.on('data', chunk => {
+      bytes += chunk.length;
+      if (bytes > limit) { reject(new Error('Body too large')); req.destroy(); return; }
+      body += chunk;
+    });
+    req.on('end', () => resolve(body));
+    req.on('error', reject);
+  });
+}
+
 const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -58,6 +86,18 @@ const server = http.createServer(async (req, res) => {
   }
 
   const url = new URL(req.url, `http://${req.headers.host}`);
+
+  // ---- HEALTH + FUNDAMENTALS STATUS ----
+  if (url.pathname === '/healthz') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: true, uptime: Math.round(process.uptime()) }));
+  }
+  if (url.pathname === '/yf-status') {
+    let state = { loaded: false };
+    try { state = { loaded: true, ...require('./yahoo-auth')._state() }; } catch (_) {}
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify(state));
+  }
 
   // ---- YAHOO FINANCE PROXY ----
   // The browser cannot call Yahoo Finance directly (no CORS headers).
@@ -149,27 +189,41 @@ const server = http.createServer(async (req, res) => {
 
   // ---- SEND EMAIL (via SMTP) ----
   if (url.pathname === '/send-email' && req.method === 'POST') {
-    let body = '';
-    req.on('data', chunk => body += chunk);
-    req.on('end', async () => {
+    const ip = req.socket.remoteAddress || 'unknown';
+    if (emailThrottled(ip)) {
+      res.writeHead(429, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ error: 'Too many email requests, slow down' }));
+    }
+    (async () => {
       try {
+        const body = await readBody(req);
         const { host, port, user, pass, to, subject, text } = JSON.parse(body);
         if (!host || !port || !user || !pass || !to || !subject || !text) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           return res.end(JSON.stringify({ error: 'Missing required fields' }));
         }
+        const portNum = parseInt(port, 10);
+        if (!EMAIL_RE.test(String(to)) || !EMAIL_RE.test(String(user))) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({ error: 'Invalid email address' }));
+        }
+        if (!(portNum > 0 && portNum < 65536)) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({ error: 'Invalid SMTP port' }));
+        }
         const transporter = nodemailer.createTransport({
-          host, port: parseInt(port), secure: parseInt(port) === 465,
+          host, port: portNum, secure: portNum === 465,
           auth: { user, pass }
         });
         await transporter.sendMail({ from: user, to, subject, text });
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true }));
       } catch (e) {
-        res.writeHead(502, { 'Content-Type': 'application/json' });
+        const code = e.message === 'Body too large' ? 413 : 502;
+        res.writeHead(code, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: e.message }));
       }
-    });
+    })();
     return;
   }
 
@@ -209,3 +263,16 @@ server.listen(PORT, () => {
     : `xdg-open "${url}"`;
   exec(cmd);
 });
+
+// Graceful shutdown: stop accepting connections and close the Yahoo browser if it was
+// launched, so Ctrl-C doesn't leave an orphaned headless Chrome behind.
+let shuttingDown = false;
+function shutdown() {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  server.close(() => process.exit(0));
+  try { require.cache[require.resolve('./yahoo-auth')] && require('./yahoo-auth').close(); } catch (_) {}
+  setTimeout(() => process.exit(0), 3000).unref();
+}
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
