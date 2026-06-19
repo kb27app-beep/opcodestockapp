@@ -256,6 +256,6 @@ async function close() {
 }
 
 module.exports = {
-  getFundamentals, close,
+  getFundamentals, close, normalize,
   _state: () => ({ alive: !!page, cacheSize: memCache.size, lastError, minIntervalMs: MIN_INTERVAL_MS }),
 };

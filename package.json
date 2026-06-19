@@ -4,7 +4,9 @@
   "description": "Local research dashboard for Indian (NSE/BSE) and US stocks, with a Yahoo Finance proxy.",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test tests/unit.test.js tests/server.test.js",
+    "test:e2e": "node --test tests/browser.e2e.js"
   },
   "dependencies": {
     "nodemailer": "^9.0.1",
