@@ -210,6 +210,28 @@ state = {
 
 ---
 
+## 8a0. Changelog (v1.3.0) — modular rebuild
+
+- **Batch 0 — modules**: `app.js` split into ordered `js/{state,data,analysis,alerts,watchlist,report,main}.js`
+  (classic scripts, shared globals, `main.js` init last). No build step.
+- **Batch 1 — backend resilience**: new `cache.js` (disk-backed TTL cache). Fundamentals and
+  the authenticated browser session now persist to `.cache/` across restarts; stale data is
+  served as a fallback; Yahoo hits are serialized through a rate-limit queue. New `/healthz`
+  and `/yf-status`. `/send-email` hardened (validation, body cap, per-IP throttle). Graceful
+  shutdown closes the headless browser.
+- **Batch 2 — tests**: `tests/` with `node:test`. `npm test` (unit + server, offline) and
+  `npm run test:e2e` (Playwright browser). 18 tests.
+- **Batch 3 — a11y + design**: skip link, ARIA roles/labels, `aria-current`, focus-visible
+  rings, `prefers-reduced-motion`, mobile sidebar backdrop, print stylesheet, skeleton utility.
+- **Batch 4 — real financials in modules**: Financial Breakdown, Valuation, and Full Analysis
+  now use live TTM figures (ROE, margins, revenue & earnings growth, D/E, EPS, beta, P/B,
+  forward P/E, FCF) when available, with honest LIVE/ESTIMATED labeling.
+- **Batch 5 — UX**: debounced search autocomplete (typeahead via `/yf-search`), sortable
+  watchlist columns, and watchlist target/stop alerts that actually fire (deduped) on refresh.
+
+File layout now: `index.html`, `styles.css`, `js/*.js`, `server.js`, `yahoo-auth.js`,
+`cache.js`, `tests/*.js`, `package.json`.
+
 ## 8a. Changelog (v1.2.0)
 
 - **Real fundamentals are now LIVE** (market cap, P/E, sector, ROE, margins, revenue, debt).

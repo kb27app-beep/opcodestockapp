@@ -1,24 +1,22 @@
-# TASK_QUEUE — ARYA'S Stocks Pro revision
+# TASK_QUEUE — ARYA'S Stocks Pro upgrade
 
-## Done
-- [A] Real-data accuracy: correct Yahoo meta fields (longName, chartPreviousClose, 52w).
-- [B] Security: server.js /proxy SSRF allowlist. Verified.
-- [C] Code quality: removed duplicate curLabel; (est.) labels; real package.json.
-- [D] Docs: ARYA.md changelogs v1.1.0 + v1.2.0.
-- [E] Real fundamentals LIVE: yahoo-auth.js (Playwright crumb automation) + /yf-fundamentals.
-      Verified end-to-end (Apple/Reliance real mcap/PE/sector/ROE). Cached + graceful fallback.
-- [F] File split: index.html + styles.css + app.js (buildless). Fixed 9 literal ${...} bugs.
-- [G] UI modernization: Fraunces/Spline Sans/JetBrains Mono, warm light+dark themes, grain,
-      micro-interactions, theme-aware gold charts, currency-correct mcap, favicon.
-      Verified via Playwright screenshots (light/dark dashboard + analyzed, both themes).
+## Done (branch: upgrade/site-overhaul, all phases committed + pushed)
+- Foundation: real Yahoo field fixes, live fundamentals (yahoo-auth.js), SSRF lockdown,
+  index.html split (styles.css/app.js), "editorial fintech" redesign.
+- Batch 0: split app.js into js/ modules.
+- Batch 1: backend resilience — cache.js, disk/session persistence, rate-limit queue,
+  /healthz + /yf-status, email hardening, graceful shutdown.
+- Batch 2: test harness — tests/ (node:test + Playwright), npm test / test:e2e, 18 tests green.
+- Batch 3: accessibility + design-system polish, mobile backdrop, print styles.
+- Batch 4: real financials wired into Financial Breakdown, Valuation, Full Analysis.
+- Batch 5: search autocomplete, sortable watchlist, firing target/stop alerts.
 
-## Open / optional follow-ups
-- Enrich the 10 analysis modules with the now-available real financials (ROE, margins,
-  revenue growth, debt) instead of template text — biggest remaining authenticity gain.
-- Consider bundling Chromium (playwright install) for users without system Chrome.
-- Surface a one-time data-provenance note explaining live vs estimated.
+## Open / future
+- Anchor the multi-year financial trend charts to real data (Yahoo gives TTM only — would
+  need a fundamentals-timeseries source).
+- Background alert polling (currently evaluated on watchlist refresh).
+- Optional paid fundamentals fallback (FMP/Alpha Vantage) for machines without local Chrome.
 
 ## Notes
 - Live fundamentals need a local Chrome (channel:'chrome'); falls back to estimates otherwise.
-- Yahoo 429-throttles rapid repeated calls; the module backs off and caches 10 min.
-- Changes are NOT committed (push to main is off-limits; commit needs explicit ask).
+- `npm test` is offline; `npm run test:e2e` needs Chrome.
