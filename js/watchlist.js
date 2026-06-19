@@ -379,13 +379,36 @@ function evaluateWatchlistAlerts(item) {
   const price = item._price;
   if (typeof price !== 'number') return;
   const sym = item.symbol;
-  if (item.alert_target && item.target_price && price >= item.target_price) {
+  const channels = (typeof activeAlertChannels === 'function') ? activeAlertChannels() : [];
+
+  if (item.alert_target && item.target_price) {
     const key = sym + ':target';
-    if (!_wlAlerted.has(key)) { _wlAlerted.add(key); try { logSentAlert(sym, 'live', `≥ ${item.target_price}`, ['watchlist'], `${sym} hit target ${item.target_price} (now ${price.toFixed(2)})`); } catch (_) {} }
+    if (price >= item.target_price) {
+      if (!_wlAlerted.has(key)) {
+        _wlAlerted.add(key);
+        const msg = `${sym} hit target ${item.target_price} (now ${price.toFixed(2)})`;
+        try { logSentAlert(sym, 'live', `≥ ${item.target_price}`, channels.length ? channels : ['watchlist'], msg); } catch (_) {}
+        if (channels.length) { try { dispatchAlert(msg, channels); } catch (_) {} }
+      }
+    } else if (price < item.target_price * 0.99) {
+      // Price fell back below the target by >1% — re-arm so a later re-crossing fires again.
+      _wlAlerted.delete(key);
+    }
   }
-  if (item.alert_stoploss && item.stop_loss && price <= item.stop_loss) {
+
+  if (item.alert_stoploss && item.stop_loss) {
     const key = sym + ':stop';
-    if (!_wlAlerted.has(key)) { _wlAlerted.add(key); try { logSentAlert(sym, 'live', `≤ ${item.stop_loss}`, ['watchlist'], `${sym} hit stop-loss ${item.stop_loss} (now ${price.toFixed(2)})`); } catch (_) {} }
+    if (price <= item.stop_loss) {
+      if (!_wlAlerted.has(key)) {
+        _wlAlerted.add(key);
+        const msg = `${sym} hit stop-loss ${item.stop_loss} (now ${price.toFixed(2)})`;
+        try { logSentAlert(sym, 'live', `≤ ${item.stop_loss}`, channels.length ? channels : ['watchlist'], msg); } catch (_) {}
+        if (channels.length) { try { dispatchAlert(msg, channels); } catch (_) {} }
+      }
+    } else if (price > item.stop_loss * 1.01) {
+      // Price recovered >1% above the stop — re-arm for the next breach.
+      _wlAlerted.delete(key);
+    }
   }
 }
 

@@ -210,6 +210,21 @@ state = {
 
 ---
 
+## 8a-1. Changelog (v1.4.0) — real-time alert polling
+
+- **Feature A — background alert polling**: while the tab is open, watchlist prices refresh on a
+  timer (default every 2 min, configurable 1–60) and target / stop-loss alerts fire through a new
+  unified `dispatchAlert(message, channels)` fan-out. Channels: browser **push**, **email** (SMTP),
+  and **Telegram** (delivered via the server `/proxy`, with `api.telegram.org` added to the SSRF
+  allowlist). WhatsApp has no free server path and is reported `unsupported` — never faked.
+- Re-crossing logic: a fired target/stop re-arms once price moves back >1% across the threshold,
+  so repeated crossings fire again instead of staying silent.
+- New Settings card (Alerts → Delivery Channels): master on/off toggle + interval, persisted via
+  `dbSet('alertPollEnabled' | 'alertPollMins')`; poller managed in `js/main.js`
+  (`startAlertPolling`/`stopAlertPolling`/`restartAlertPolling`).
+- Tests: +1 server test (Telegram host passes the allowlist), +2 e2e (firing path logs a sent
+  alert; `dispatchAlert` reports whatsapp `unsupported`). `npm test` 13, `npm run test:e2e` 8.
+
 ## 8a0. Changelog (v1.3.0) — modular rebuild
 
 - **Batch 0 — modules**: `app.js` split into ordered `js/{state,data,analysis,alerts,watchlist,report,main}.js`

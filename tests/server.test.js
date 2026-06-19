@@ -53,6 +53,16 @@ test('/proxy requires a url param', async () => {
   assert.strictEqual((await get('/proxy')).status, 400);
 });
 
+test('/proxy allows api.telegram.org (alert dispatch host)', async () => {
+  // Allowlisted host must pass the SSRF guard. Whether the upstream call
+  // succeeds (200/4xx passthrough) or fails offline (502), it must NOT be the
+  // 403 the guard returns for blocked hosts, nor the 400 for a missing url.
+  const url = 'https://api.telegram.org/bot0:TEST/getMe';
+  const r = await get('/proxy?url=' + encodeURIComponent(url));
+  assert.notStrictEqual(r.status, 403, 'telegram host should be allowed');
+  assert.notStrictEqual(r.status, 400);
+});
+
 test('/yf and /yf-fundamentals require a symbol', async () => {
   assert.strictEqual((await get('/yf')).status, 400);
   assert.strictEqual((await get('/yf-fundamentals')).status, 400);

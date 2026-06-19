@@ -243,6 +243,69 @@ function enablePushNotifications() {
   });
 }
 
+// Deliver a Telegram message through this server's /proxy. Routing via /proxy
+// (rather than hitting api.telegram.org directly) keeps the bot token out of
+// cross-origin requests and lets the SSRF allowlist gate the destination.
+// Returns true on a confirmed Telegram "ok" response.
+async function sendTelegramAlert(message) {
+  if (!state.telegramToken || !state.telegramChatId) return false;
+  try {
+    const tgUrl = `https://api.telegram.org/bot${encodeURIComponent(state.telegramToken)}/sendMessage`
+      + `?chat_id=${encodeURIComponent(state.telegramChatId)}&text=${encodeURIComponent(message)}`;
+    const proxy = localServer || window.location.origin;
+    const resp = await fetch(`${proxy}/proxy?url=${encodeURIComponent(tgUrl)}`);
+    const data = await resp.json().catch(() => null);
+    return !!(data && data.ok);
+  } catch (e) {
+    console.error('Telegram send error:', e);
+    return false;
+  }
+}
+
+// Unified alert fan-out: deliver `message` through each requested channel.
+// `channels` is an array of channel names (case-insensitive): 'push', 'email',
+// 'telegram', 'whatsapp'. Each channel degrades gracefully when unconfigured.
+// Returns a map of channel -> outcome ('sent' | 'skipped' | 'unsupported').
+async function dispatchAlert(message, channels) {
+  const want = (channels || []).map(c => String(c).toLowerCase());
+  const result = {};
+
+  if (want.includes('push')) {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      try { new Notification('ARYA\u2019S Stocks Pro', { body: message }); result.push = 'sent'; }
+      catch (_) { result.push = 'skipped'; }
+    } else { result.push = 'skipped'; }
+  }
+
+  if (want.includes('email')) {
+    if (state.emailAddress && state.smtpHost && state.smtpPort && state.smtpUser && state.smtpPass) {
+      const ok = await sendEmailAlert(state.emailAddress, 'ARYA\u2019S Stocks Pro Alert', message);
+      result.email = ok ? 'sent' : 'skipped';
+    } else { result.email = 'skipped'; }
+  }
+
+  if (want.includes('telegram')) {
+    const ok = await sendTelegramAlert(message);
+    result.telegram = ok ? 'sent' : 'skipped';
+  }
+
+  // WhatsApp has no free server-side delivery path here; never fake a send.
+  if (want.includes('whatsapp')) result.whatsapp = 'unsupported';
+
+  return result;
+}
+
+// The channels that the background poller fires through. A channel is only
+// "active" once its prerequisites are configured, so a fresh install fires
+// nothing surprising. Push is included whenever the user has granted it.
+function activeAlertChannels() {
+  const channels = [];
+  if ('Notification' in window && Notification.permission === 'granted') channels.push('push');
+  if (state.emailAddress && state.smtpHost && state.smtpUser && state.smtpPass) channels.push('email');
+  if (state.telegramToken && state.telegramChatId) channels.push('telegram');
+  return channels;
+}
+
 // ============================================================
 // SETTINGS
 // ============================================================
@@ -272,6 +335,22 @@ async function testConnection() {
   } catch (e) {
     status.innerHTML = '❌ Connection failed. Try setting a custom CORS proxy above.';
   }
+}
+
+// Persist the background-poller settings (master on/off + interval in minutes)
+// and restart the poller so changes take effect immediately.
+function saveAlertPolling() {
+  const enabled = document.getElementById('alertPollEnabled').checked;
+  let mins = parseFloat(document.getElementById('alertPollMins').value);
+  if (!(mins > 0)) mins = 2;
+  mins = Math.max(1, Math.min(60, mins));   // clamp to a sane 1–60 min window
+  document.getElementById('alertPollMins').value = mins;
+  dbSet('alertPollEnabled', enabled ? '1' : '0');
+  dbSet('alertPollMins', String(mins));
+  restartAlertPolling();
+  const status = document.getElementById('alertPollStatus');
+  status.textContent = enabled ? `Polling every ${mins} min` : 'Polling paused';
+  setTimeout(() => status.textContent = '', 3000);
 }
 
 function savePerplexityKey() {

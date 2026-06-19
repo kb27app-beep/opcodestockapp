@@ -350,6 +350,27 @@
           <button class="btn btn-primary btn-sm" style="margin-top:8px" onclick="enablePushNotifications()"><i class="fas fa-bell"></i> Enable Notifications</button>
         </div>
         <div class="card">
+          <h3><i class="fas fa-satellite-dish"></i> Real-Time Alert Polling</h3>
+          <p style="font-size:13px; color:var(--text-secondary)">While this tab is open, watchlist prices refresh on a timer and any target / stop-loss alerts fire through your enabled channels (push, email, Telegram).</p>
+          <div style="display:flex; align-items:center; gap:12px; margin-top:12px; flex-wrap:wrap">
+            <label class="switch" style="width:52px;height:28px">
+              <input type="checkbox" id="alertPollEnabled" checked>
+              <span class="slider"></span>
+            </label>
+            <span style="font-size:14px; color:var(--text-secondary)">Background polling</span>
+            <div style="display:flex; align-items:center; gap:6px; margin-left:auto">
+              <label for="alertPollMins" style="font-size:13px; color:var(--text-secondary)">Every</label>
+              <input type="number" id="alertPollMins" class="search-box" min="1" max="60" step="1" value="2" style="width:72px; text-align:right">
+              <span style="font-size:13px; color:var(--text-secondary)">min</span>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; margin-top:12px">
+            <button class="btn btn-primary btn-sm" onclick="saveAlertPolling()"><i class="fas fa-save"></i> Save</button>
+            <span id="alertPollStatus" class="text-muted" style="font-size:12px"></span>
+          </div>
+          <p style="margin-top:10px; font-size:12px; color:var(--text-muted)"><i class="fas fa-info-circle"></i> Telegram delivery routes through this server's proxy; configure your bot token above. Yahoo throttles rapid requests, so keep the interval at 1 min or higher.</p>
+        </div>
+        <div class="card">
           <h3><i class="fas fa-envelope" style="color:#ea4335"></i> Email Alerts</h3>
           <div style="margin-top:12px">
             <label style="font-size:13px; color:var(--text-secondary); display:block; margin-bottom:6px">Email Address</label>

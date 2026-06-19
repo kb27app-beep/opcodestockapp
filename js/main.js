@@ -2,6 +2,38 @@
 // Part of ARYA'S Stocks Pro. Loaded as an ordered classic script (shared globals).
 
 // ============================================================
+// BACKGROUND ALERT POLLING
+// ============================================================
+// While the tab is open, periodically refresh watchlist prices so configured
+// target/stop alerts actually fire (refreshWatchlist -> evaluateWatchlistAlerts
+// -> dispatchAlert). The interval id lives on a module var so a settings change
+// can clear and restart it.
+let _alertPollTimer = null;
+
+function alertPollEnabled() { return dbGet('alertPollEnabled') !== '0'; }
+function alertPollMins() {
+  const m = parseFloat(dbGet('alertPollMins'));
+  return (m > 0) ? Math.max(1, Math.min(60, m)) : 2;
+}
+
+function startAlertPolling() {
+  stopAlertPolling();
+  if (!alertPollEnabled()) return;
+  const ms = alertPollMins() * 60 * 1000;
+  _alertPollTimer = setInterval(() => {
+    // Only poll when there's something to watch; refreshWatchlist no-ops on empty.
+    try { refreshWatchlist(); } catch (e) { console.warn('Alert poll failed:', e.message); }
+  }, ms);
+  console.log(`Alert polling started: every ${alertPollMins()} min`);
+}
+
+function stopAlertPolling() {
+  if (_alertPollTimer) { clearInterval(_alertPollTimer); _alertPollTimer = null; }
+}
+
+function restartAlertPolling() { startAlertPolling(); }
+
+// ============================================================
 // INIT
 // ============================================================
 document.addEventListener('DOMContentLoaded', async () => {
@@ -51,6 +83,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   populateAlertDropdowns();
   renderWatchlist();
   renderSentAlerts();
+
+  // Restore background-poller settings into the UI and start the poller.
+  const pollEnabledEl = document.getElementById('alertPollEnabled');
+  const pollMinsEl = document.getElementById('alertPollMins');
+  if (pollEnabledEl) pollEnabledEl.checked = alertPollEnabled();
+  if (pollMinsEl) pollMinsEl.value = alertPollMins();
+  startAlertPolling();
 
   const params = new URLSearchParams(window.location.search);
   if (params.get('stock')) {

@@ -67,6 +67,27 @@ test('guessSector classifies known tickers', async () => {
   assert.strictEqual(out.unknown, 'DEFAULT');
 });
 
+test('evaluateWatchlistAlerts fires and logs a sent alert on target hit', async () => {
+  await page.context().grantPermissions(['notifications'], { origin: BASE });
+  const out = await page.evaluate(() => {
+    state.emailAddress = ''; state.telegramToken = '';   // isolate to the push channel
+    const before = getSentAlerts().length;
+    const item = { symbol: 'TESTX.NS', _price: 150, target_price: 100, alert_target: 1, stop_loss: null, alert_stoploss: 0 };
+    evaluateWatchlistAlerts(item);
+    const alerts = getSentAlerts();
+    return { before, after: alerts.length, top: alerts[0] || null, channels: activeAlertChannels() };
+  });
+  assert.strictEqual(out.after, out.before + 1, 'expected exactly one new sent alert');
+  assert.match(out.top.message, /TESTX\.NS hit target 100/);
+  assert.ok(out.channels.includes('push'), 'push channel should be active after grant');
+});
+
+test('dispatchAlert reports whatsapp as unsupported, never faked', async () => {
+  const out = await page.evaluate(async () => await dispatchAlert('test', ['whatsapp', 'email']));
+  assert.strictEqual(out.whatsapp, 'unsupported');
+  assert.strictEqual(out.email, 'skipped');   // no SMTP configured in test
+});
+
 test('no unexpected page errors (sql.js wasm in headless is allowed)', () => {
   const unexpected = pageErrors.filter(e => !/WebAssembly|wasm|LinkError/i.test(e));
   assert.deepStrictEqual(unexpected, [], 'unexpected page errors: ' + unexpected.join(' | '));

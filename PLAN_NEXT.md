@@ -1,8 +1,11 @@
 # HANDOFF PLAN — next session (read this first)
 
-This is a self-contained brief for a fresh Claude session. Two features to build:
+This is a self-contained brief for a fresh Claude session. Two features were planned:
 **(A) real-time background alert polling** and **(B) optional paid fundamentals fallback**.
-Everything you need to start is here; the codebase is already modular and tested.
+
+> **STATUS: Feature A is DONE** (v1.4.0, committed + pushed on `upgrade/site-overhaul`). Only
+> **Feature B** below remains. Feature A section is kept for reference. Everything you need to
+> start B is here; the codebase is already modular and tested (`npm test` 13, `test:e2e` 8).
 
 ## Ground rules (from the user)
 - **Do NOT create a GitHub PR** and **never push to `main`**.

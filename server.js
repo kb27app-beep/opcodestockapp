@@ -28,6 +28,10 @@ const PROXY_ALLOWED_HOSTS = [
   'finance.yahoo.com',
   'stooq.com',
   'stooq.pl',
+  // Telegram Bot API — used by the client-side alert dispatcher to deliver
+  // push messages through this server's /proxy (keeps the bot token off any
+  // third-party CORS proxy and out of cross-origin requests).
+  'api.telegram.org',
 ];
 
 function isProxyTargetAllowed(targetUrl) {
