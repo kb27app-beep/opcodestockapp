@@ -291,7 +291,7 @@ const server = http.createServer(async (req, res) => {
     };
 
     const fresh = url.searchParams.get('fresh') === '1';
-    const model = url.searchParams.get('model') || 'sonnet';
+    const model = url.searchParams.get('model') || 'haiku';
     const cacheKey = `airesearch-v1-${symbol}`;
 
     // Offline test seam: deterministic SSE without touching the real CLI.

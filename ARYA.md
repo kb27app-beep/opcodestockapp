@@ -220,8 +220,8 @@ state = {
   `claude` CLI in print mode with `--output-format stream-json --include-partial-messages`,
   parses text deltas, and resolves with the final report. The future Telegram bot reuses this.
 - **Runs on your Claude subscription, not paid tokens**: `cleanEnv` strips `ANTHROPIC_API_KEY`/
-  `ANTHROPIC*` so the CLI uses the logged-in session. Default model is `sonnet`; override per
-  request with `?model=haiku` to conserve quota.
+  `ANTHROPIC*` so the CLI uses the logged-in session. Default model is `haiku` (cheapest on
+  quota); override per request with `?model=sonnet` for a deeper report.
 - **Skill/workflow-hijack guard** (found via live testing): without it, headless `claude -p`
   picks up the user's global `~/.claude` skills and forks a background "deep-research" workflow
   instead of answering. Fixed with `--disallowedTools Skill Task Workflow TodoWrite` + an inline

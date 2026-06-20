@@ -78,7 +78,8 @@ function cleanEnv() {
 }
 
 function runResearch(symbol, context, onText, opts = {}) {
-  const { model = 'sonnet', timeoutMs = 240000, _spawn = childProcess.spawn } = opts;
+  // Default haiku to conserve subscription quota; callers pass a stronger model when wanted.
+  const { model = 'haiku', timeoutMs = 240000, _spawn = childProcess.spawn } = opts;
   if (_inflight >= MAX_CONCURRENT) {
     return Promise.reject(Object.assign(new Error('Too many concurrent research runs'), { code: 'busy' }));
   }
