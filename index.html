@@ -82,6 +82,9 @@
     <button class="btn btn-primary" onclick="searchStock()"><i class="fas fa-play"></i> Analyze</button>
     <button class="btn btn-success" onclick="generateFullReport()"><i class="fas fa-file-pdf"></i> Full Report</button>
     <button class="btn btn-outline" onclick="downloadReport()"><i class="fas fa-download"></i> PDF</button>
+    <button id="aiResearchBtn" class="btn btn-ai" onclick="startAiResearch()" disabled>
+      AI Research
+    </button>
     <div id="statusBar" role="status" aria-live="polite" style="font-size:12px;color:var(--text-muted);display:none;padding:4px 8px;background:var(--bg-card);border-radius:6px;border:1px solid var(--border);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
     <label class="switch" style="margin-left:4px" title="Toggle Dark/Cream mode">
       <input type="checkbox" id="themeToggle" onchange="toggleTheme()" aria-label="Toggle dark mode">
@@ -455,6 +458,15 @@
       </div>
     </div>
   </div>
+
+  <section id="aiResearchPanel" class="ai-panel" hidden>
+    <div class="ai-panel-head">
+      <h2>AI Research</h2>
+      <span id="aiResearchMeta" class="ai-meta"></span>
+      <button id="aiResearchRerun" class="btn btn-sm" onclick="startAiResearch(true)" hidden>Re-run</button>
+    </div>
+    <div id="aiResearchBody" class="ai-panel-body"></div>
+  </section>
 </div>
 
 <!-- App modules: ordered classic scripts sharing globals; main.js (init) must be last. -->
@@ -464,6 +476,7 @@
 <script src="js/alerts.js"></script>
 <script src="js/watchlist.js"></script>
 <script src="js/report.js"></script>
+<script src="js/ai-research.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

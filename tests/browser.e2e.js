@@ -92,3 +92,12 @@ test('no unexpected page errors (sql.js wasm in headless is allowed)', () => {
   const unexpected = pageErrors.filter(e => !/WebAssembly|wasm|LinkError/i.test(e));
   assert.deepStrictEqual(unexpected, [], 'unexpected page errors: ' + unexpected.join(' | '));
 });
+
+test('AI research panel is wired (button, panel, handler)', async () => {
+  // page already loaded by this suite's harness; reuse its `page` handle.
+  const ok = await page.evaluate(() =>
+    !!document.getElementById('aiResearchBtn') &&
+    !!document.getElementById('aiResearchPanel') &&
+    typeof window.startAiResearch === 'function');
+  assert.strictEqual(ok, true);
+});

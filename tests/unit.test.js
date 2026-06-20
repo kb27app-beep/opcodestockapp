@@ -98,3 +98,96 @@ test('normalizeFmp: missing sections degrade to null without crashing', () => {
   assert.strictEqual(n.debtToEquity, null);
   assert.strictEqual(n.totalRevenue, null);
 });
+
+const { parseStreamJsonLine } = require('../ai-research');
+
+test('parseStreamJsonLine: extracts text deltas, final result, ignores noise', () => {
+  const lines = fs.readFileSync(path.join(__dirname, 'fixtures/claude-stream.jsonl'), 'utf8')
+    .split('\n').filter(Boolean);
+  const parsed = lines.map(parseStreamJsonLine);
+  const deltas = parsed.filter(p => p && p.kind === 'delta').map(p => p.text);
+  assert.deepStrictEqual(deltas, ['Hello', ' world']);
+  const final = parsed.find(p => p && p.kind === 'final');
+  assert.strictEqual(final.text, 'Hello world.');
+  assert.strictEqual(parsed[0], null); // system/init ignored
+});
+
+test('parseStreamJsonLine: flags rate limit and errors', () => {
+  assert.strictEqual(
+    parseStreamJsonLine('{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","overageDisabledReason":"out_of_credits","resetsAt":1781934600}}').kind,
+    'rate_limited');
+  assert.strictEqual(
+    parseStreamJsonLine('{"type":"result","is_error":true,"subtype":"error_max_turns"}').kind,
+    'error');
+  assert.strictEqual(parseStreamJsonLine('not json'), null);
+});
+
+const { buildPrompt } = require('../ai-research');
+
+test('buildPrompt: includes symbol, US framing, and all 7 sections', () => {
+  const p = buildPrompt('NVDA', { currentPrice: 170.2, sector: 'Technology' });
+  assert.match(p, /NVDA/);
+  assert.match(p, /US|United States/i);
+  for (const s of ['News', 'Earnings', 'Analyst', 'Bull', 'Bear', 'Risk', 'Verdict']) {
+    assert.match(p, new RegExp(s, 'i'));
+  }
+  assert.match(p, /170\.2/); // grounded with provided context
+});
+
+test('buildPrompt: omits context line cleanly when none given', () => {
+  const p = buildPrompt('AAPL');
+  assert.match(p, /AAPL/);
+  assert.doesNotMatch(p, /undefined|null|NaN/);
+});
+
+const { runResearch } = require('../ai-research');
+const { EventEmitter } = require('events');
+const { Readable } = require('stream');
+
+function fakeSpawnFromFixture() {
+  const fixture = fs.readFileSync(path.join(__dirname, 'fixtures/claude-stream.jsonl'), 'utf8');
+  return () => {
+    const proc = new EventEmitter();
+    proc.stdout = Readable.from([fixture]);
+    proc.stderr = Readable.from([]);
+    proc.kill = () => {};
+    // emit close after streams flush
+    setImmediate(() => proc.emit('close', 0));
+    return proc;
+  };
+}
+
+test('runResearch: streams deltas and resolves with final text', async () => {
+  const got = [];
+  const res = await runResearch('NVDA', {}, d => got.push(d), { _spawn: fakeSpawnFromFixture() });
+  assert.deepStrictEqual(got, ['Hello', ' world']);
+  assert.strictEqual(res.text, 'Hello world.');
+});
+
+test('runResearch: maps spawn ENOENT to cli_missing', async () => {
+  const fake = () => { const p = new EventEmitter(); p.stdout = Readable.from([]); p.stderr = Readable.from([]); p.kill = () => {};
+    setImmediate(() => p.emit('error', Object.assign(new Error('nope'), { code: 'ENOENT' }))); return p; };
+  await assert.rejects(runResearch('NVDA', {}, () => {}, { _spawn: fake }),
+    err => err.code === 'cli_missing');
+});
+
+test('runResearch: blocks skill/agent/workflow hijack and enables only web tools', async () => {
+  // Regression guard: a headless claude run must not be able to fork a background
+  // deep-research workflow; it must answer inline with only web tools.
+  let capturedArgs = null;
+  const fixture = fs.readFileSync(path.join(__dirname, 'fixtures/claude-stream.jsonl'), 'utf8');
+  const fake = (_cmd, args) => {
+    capturedArgs = args;
+    const p = new EventEmitter();
+    p.stdout = Readable.from([fixture]); p.stderr = Readable.from([]); p.kill = () => {};
+    setImmediate(() => p.emit('close', 0));
+    return p;
+  };
+  await runResearch('NVDA', {}, () => {}, { _spawn: fake });
+  const di = capturedArgs.indexOf('--disallowedTools');
+  assert.ok(di >= 0, 'must pass --disallowedTools');
+  for (const t of ['Skill', 'Task', 'Workflow']) assert.ok(capturedArgs.includes(t), `must disallow ${t}`);
+  const ai = capturedArgs.indexOf('--allowedTools');
+  assert.ok(ai >= 0 && capturedArgs.includes('WebSearch'), 'must allow WebSearch');
+  assert.ok(capturedArgs.includes('--append-system-prompt'), 'must steer inline answering');
+});

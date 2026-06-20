@@ -51,7 +51,22 @@ async function fetchUrl(targetUrl) {
   return { status: resp.status, contentType, text };
 }
 
+const cache = require('./cache');
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Maps typed errors from ai-research.js to user-friendly messages; keeps error copy
+// in one place rather than scattered across the SSE handler.
+function friendlyError(err) {
+  switch (err.code) {
+    case 'cli_missing': return 'Claude CLI not found on the server host.';
+    case 'not_authenticated': return 'Claude CLI not logged in -- run `claude` once to authenticate.';
+    case 'timeout': return 'Research timed out after 240s. Try again or narrow the request.';
+    case 'rate_limited': return err.message;
+    case 'busy': return 'Another research run is in progress. Try again shortly.';
+    default: return 'AI research failed. See server log for details.';
+  }
+}
 const MAX_BODY_BYTES = 256 * 1024;            // reject oversized POST bodies
 
 // Lightweight per-IP throttle for the email endpoint (which sends real mail).
@@ -255,6 +270,74 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ---- AI RESEARCH SSE ----
+  // Streams a claude-generated research report for a US stock symbol.
+  // Uses AI_RESEARCH_FAKE=1 as a test seam so server tests stay offline.
+  if (url.pathname === '/ai-research') {
+    const symbol = (url.searchParams.get('symbol') || '').toUpperCase();
+    if (!/^[A-Z.]{1,8}$/.test(symbol)) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'invalid symbol' }));
+      return;
+    }
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    });
+    const send = (obj, event) => {
+      if (event) res.write(`event: ${event}\n`);
+      res.write(`data: ${JSON.stringify(obj)}\n\n`);
+    };
+
+    const fresh = url.searchParams.get('fresh') === '1';
+    const model = url.searchParams.get('model') || 'sonnet';
+    const cacheKey = `airesearch-v1-${symbol}`;
+
+    // Offline test seam: deterministic SSE without touching the real CLI.
+    if (process.env.AI_RESEARCH_FAKE === '1') {
+      send({ delta: 'Fake research for ' + symbol });
+      send({ cached: false, durationMs: 1 }, 'done');
+      res.end();
+      return;
+    }
+
+    if (!fresh) {
+      const hit = cache.read(cacheKey, 60 * 60 * 1000); // {data, ts, fresh} | null
+      if (hit && hit.fresh && hit.data) {
+        send({ cached: true });
+        send({ delta: hit.data });
+        send({ cached: true, durationMs: 0 }, 'done');
+        res.end();
+        return;
+      }
+    }
+
+    // Optional grounding context passed from the browser (kept small; engine tolerates gaps).
+    const num = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? n : undefined; };
+    const context = {
+      name: url.searchParams.get('name') || undefined,
+      currentPrice: num(url.searchParams.get('price')),
+      pe: num(url.searchParams.get('pe')),
+      sector: url.searchParams.get('sector') || undefined,
+      marketCap: num(url.searchParams.get('mcap')),
+    };
+
+    const { runResearch } = require('./ai-research');
+    runResearch(symbol, context, delta => send({ delta }), { model })
+      .then(({ text, durationMs }) => {
+        cache.write(cacheKey, text);
+        send({ cached: false, durationMs }, 'done');
+        res.end();
+      })
+      .catch(err => {
+        console.error('ai-research error:', err.code, err.message);
+        send({ code: err.code || 'error', message: friendlyError(err) }, 'error');
+        res.end();
+      });
+    return;
+  }
+
   // ---- STATIC FILES ----
   let filePath = url.pathname === '/' ? '/index.html' : url.pathname;
   filePath = path.join(ROOT, filePath);
@@ -275,6 +358,15 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
+function openBrowser(url) {
+  const { exec } = require('child_process');
+  const platform = process.platform;
+  const cmd = platform === 'win32' ? `start "" "${url}"`
+    : platform === 'darwin' ? `open "${url}"`
+    : `xdg-open "${url}"`;
+  exec(cmd);
+}
+
 server.listen(PORT, () => {
   const url = `http://localhost:${PORT}`;
   console.log('');
@@ -284,12 +376,27 @@ server.listen(PORT, () => {
   console.log('============================================');
   console.log('  Open this link in your browser!');
   console.log('');
-  const { exec } = require('child_process');
-  const platform = process.platform;
-  const cmd = platform === 'win32' ? `start "" "${url}"`
-    : platform === 'darwin' ? `open "${url}"`
-    : `xdg-open "${url}"`;
-  exec(cmd);
+  // Only pop a browser tab for a normal launch (npm start / start.bat / node server.js),
+  // which uses the default port. Test harnesses and scratch scripts set an explicit PORT
+  // and must NOT spawn tabs (that was littering random-port tabs across sessions).
+  // NO_OPEN=1 also suppresses it for headless/CI use.
+  if (!process.env.PORT && !process.env.NO_OPEN) openBrowser(url);
+});
+
+// If the default port is already taken it's almost always a previous instance still
+// running. Don't crash with an unhandled 'error' and don't silently climb to a random
+// port — point the user at the existing server on 3000 and exit cleanly.
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    const url = `http://localhost:${PORT}`;
+    console.error('');
+    console.error(`  Port ${PORT} is already in use — a server is likely already running.`);
+    console.error(`  Open ${url} in your browser (or stop the other process and retry).`);
+    console.error('');
+    if (!process.env.PORT && !process.env.NO_OPEN) openBrowser(url);
+    process.exit(0);
+  }
+  throw err;
 });
 
 // Graceful shutdown: stop accepting connections and close the Yahoo browser if it was

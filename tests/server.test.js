@@ -19,7 +19,7 @@ function get(p) {
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 before(async () => {
-  srv = spawn('node', ['server.js'], { cwd: path.join(__dirname, '..'), env: { ...process.env, PORT: String(PORT) }, stdio: 'ignore' });
+  srv = spawn('node', ['server.js'], { cwd: path.join(__dirname, '..'), env: { ...process.env, PORT: String(PORT), AI_RESEARCH_FAKE: '1' }, stdio: 'ignore' });
   // Wait for the server to answer /healthz.
   for (let i = 0; i < 30; i++) {
     try { if ((await get('/healthz')).status === 200) return; } catch (_) {}
@@ -75,4 +75,17 @@ test('static index.html and js modules are served', async () => {
   assert.strictEqual((await get('/')).status, 200);
   assert.strictEqual((await get('/js/main.js')).status, 200);
   assert.strictEqual((await get('/styles.css')).status, 200);
+});
+
+test('/ai-research rejects an invalid symbol with 400', async () => {
+  const res = await fetch(`${BASE}/ai-research?symbol=@@bad`);
+  assert.strictEqual(res.status, 400);
+});
+
+test('/ai-research streams SSE and ends with done (fake engine)', async () => {
+  const res = await fetch(`${BASE}/ai-research?symbol=NVDA`);
+  assert.strictEqual(res.status, 200);
+  assert.match(res.headers.get('content-type') || '', /text\/event-stream/);
+  const body = await res.text();
+  assert.match(body, /event: done/);
 });

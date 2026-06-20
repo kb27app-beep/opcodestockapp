@@ -57,7 +57,17 @@ async function fetchYfJson(symbol, range, interval) {
   const proxy = localServer || window.location.origin;
   const url = `${proxy}/yf?symbol=${encodeURIComponent(symbol)}&range=${range}&interval=${interval}`;
   console.log('fetchYfJson:', url);
-  const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+  let resp;
+  try {
+    resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+  } catch (netErr) {
+    // A thrown fetch (vs. an HTTP error status) means the data server isn't reachable
+    // at this origin — almost always the app was opened on a static-file port instead
+    // of the proxy. Tag it so callers can show actionable guidance, not "no data".
+    const e = new Error(`Cannot reach the data server at ${proxy}. Start it with "npm start" and open http://localhost:3000 (a plain static server has no Yahoo proxy).`);
+    e.proxyUnreachable = true;
+    throw e;
+  }
   if (!resp.ok) throw new Error(`HTTP ${resp.status} from proxy`);
   const j = await resp.json();
   if (!j?.chart?.result?.[0]) throw new Error('No chart data in response');
@@ -73,6 +83,7 @@ async function fetchStockData(symbol) {
   let chartJson, chartResult, meta, quote, history = null;
   let usedSymbol = symbol;
 
+  let lastErr = null;
   for (const sym of trySymbols) {
     try {
       chartJson = await fetchYfJson(sym, '1mo', '1d');
@@ -82,8 +93,14 @@ async function fetchStockData(symbol) {
         quote = chartResult.indicators?.quote?.[0];
         if (meta && quote) { usedSymbol = sym; break; }
       }
-    } catch (_) {}
+    } catch (e) {
+      lastErr = e;
+      // No point retrying other symbols if the server itself is unreachable.
+      if (e?.proxyUnreachable) break;
+    }
   }
+  // Distinguish "server down" from "ticker not found" so the user gets the right fix.
+  if (lastErr?.proxyUnreachable) throw lastErr;
   if (!meta || !quote) throw new Error('No price data found for this symbol.');
 
   // Fetch history for user-selected period
@@ -148,6 +165,8 @@ async function searchStock() {
     await runAllAnalyses();
     showPage('dashboard');
     renderDashboard();
+    const aiBtn = document.getElementById('aiResearchBtn');
+    if (aiBtn) aiBtn.disabled = false;
     const real = state._extraData && isRealSource(state._extraData.source);
     showStatus(`✓ ${symbol} analyzed${real ? ' · live fundamentals' : ' · estimated fundamentals'}`, 'success');
   } catch (err) {

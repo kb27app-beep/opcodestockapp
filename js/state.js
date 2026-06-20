@@ -10,7 +10,11 @@ let SQL = null;
 async function initDatabase() {
   if (!window.initSqlJs) return;
   try {
-    SQL = await initSqlJs({ locateFile: file => 'https://sql.js.org/dist/sql-wasm.wasm' });
+    // Pin the wasm binary to the SAME version as the JS glue loaded in index.html
+    // (sql.js@1.10.2). Pointing at sql.js.org/dist served whichever build was current
+    // there, and a glue/binary mismatch throws a WebAssembly LinkError ("Import ...
+    // requires a callable"), forcing the localStorage fallback.
+    SQL = await initSqlJs({ locateFile: file => `https://cdn.jsdelivr.net/npm/sql.js@1.10.2/dist/${file}` });
     const saved = localStorage.getItem('stockAppDb');
     if (saved) {
       const buf = Uint8Array.from(atob(saved), c => c.charCodeAt(0));

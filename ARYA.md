@@ -210,6 +210,34 @@ state = {
 
 ---
 
+## 8a-3. Changelog (v1.6.0) — on-demand AI Research panel (claude -p, streamed)
+
+- **AI Research panel**: per US stock, an "AI Research" button streams a live, web-searched
+  research report (News & catalysts, latest + next earnings, analyst sentiment/targets, bull,
+  bear, key risks, verdict) into a panel, rendered as markdown as it arrives.
+- New server-side module `ai-research.js` (reusable, HTTP/Telegram-agnostic): `buildPrompt`,
+  `parseStreamJsonLine`, `runResearch(symbol, context, onText, opts)`. It spawns the local
+  `claude` CLI in print mode with `--output-format stream-json --include-partial-messages`,
+  parses text deltas, and resolves with the final report. The future Telegram bot reuses this.
+- **Runs on your Claude subscription, not paid tokens**: `cleanEnv` strips `ANTHROPIC_API_KEY`/
+  `ANTHROPIC*` so the CLI uses the logged-in session. Default model is `sonnet`; override per
+  request with `?model=haiku` to conserve quota.
+- **Skill/workflow-hijack guard** (found via live testing): without it, headless `claude -p`
+  picks up the user's global `~/.claude` skills and forks a background "deep-research" workflow
+  instead of answering. Fixed with `--disallowedTools Skill Task Workflow TodoWrite` + an inline
+  directive, keeping the run synchronous. (Cannot use `CLAUDE_CONFIG_DIR` to isolate — that dir
+  holds the subscription credentials.)
+- New endpoint `GET /ai-research?symbol=SYMBOL[&fresh=1][&model=...]` streams SSE
+  (`data:{delta}` ... `event: done`/`error`). Symbol is validated `^[A-Z.]{1,8}$`; the CLI is
+  spawned with an args array (no shell), 240s timeout, max 2 concurrent runs.
+- **Caching**: final reports cached `airesearch-v1-<SYM>` (60-min TTL) via `cache.js`; the panel
+  replays instantly and offers a "Re-run" (`&fresh=1`). Browser sends price/sector grounding.
+- Tests: +6 (parser, prompt builder, runResearch stream + ENOENT + hijack-guard, SSE endpoint).
+  `npm test` 24, `npm run test:e2e` 9. Verified live: real AAPL report streamed to `done` in
+  ~81s on haiku with cited sources; cached replay 0ms.
+- Spec + plan: `docs/superpowers/specs/2026-06-20-ai-research-panel-design.md`,
+  `docs/superpowers/plans/2026-06-20-ai-research-panel.md`.
+
 ## 8a-2. Changelog (v1.5.0) — optional paid fundamentals fallback
 
 - **Feature B — paid fundamentals fallback (FMP)**: when the free Yahoo path fails (no local

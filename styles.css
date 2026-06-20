@@ -498,3 +498,14 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   .nav-item { padding: 9px 12px; font-size: 12px; }
   .page-header h1 { font-size: 24px; }
 }
+
+
+/* ---------- AI Research Panel ---------- */
+.ai-panel { margin-top: 1.5rem; border: 1px solid var(--border, #e5e0d8); border-radius: 12px; padding: 1.25rem; background: var(--card, #fff); }
+.ai-panel-head { display: flex; align-items: center; gap: .75rem; }
+.ai-panel-head h2 { margin: 0; font-size: 1.1rem; }
+.ai-meta { color: var(--muted, #888); font-size: .85rem; }
+.ai-panel-body { margin-top: .75rem; line-height: 1.55; }
+.ai-panel-body h2, .ai-panel-body h3, .ai-panel-body h4 { margin: 1rem 0 .35rem; }
+.ai-error { color: #b00020; }
+.btn-ai { background: #5b4bd6; color: #fff; }

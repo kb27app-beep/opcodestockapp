@@ -1,0 +1,5 @@
+{"type":"system","subtype":"init","session_id":"x"}
+{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello"}}}
+{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" world"}}}
+{"type":"rate_limit_event","rate_limit_info":{"status":"allowed","resetsAt":1781934600}}
+{"type":"result","subtype":"success","is_error":false,"result":"Hello world.","duration_ms":2174}
