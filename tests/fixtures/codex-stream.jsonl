@@ -1,0 +1,8 @@
+{"type":"thread.started","thread_id":"th_probe"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"Checking a current source for the ticker."}}
+{"type":"item.started","item":{"id":"item_3","type":"web_search","query":"NVIDIA stock ticker exchange","action":"search"}}
+{"type":"item.completed","item":{"id":"item_3","type":"web_search","query":"NVIDIA stock ticker exchange","action":"search"}}
+{"type":"item.completed","item":{"id":"item_4","type":"command_execution","command":"ls","aggregated_output":"","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_9","type":"agent_message","text":"NVIDIA's ticker is NVDA on the Nasdaq: https://www.nasdaq.com/market-activity/stocks/nvda"}}
+{"type":"turn.completed"}
