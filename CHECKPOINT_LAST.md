@@ -1,43 +1,48 @@
-# CHECKPOINT — ARYA'S Stocks Pro
+# CHECKPOINT — ARYA'S Stocks Pro → SmartInvest
 
-## STATUS: Part 2 multi-provider AI engine (v1.7.0) — DONE, tested, reviewed
+## STATUS: Merge Slice 1 — DONE (monorepo + engine port + streaming UI), local-only
 
-Branch `upgrade/site-overhaul`. Engine generalized from claude-only to a provider cascade.
-All committed (latest: review fixes `0dc5f51`). NOT pushed yet.
+**Active repo is now `../smartinvest`** (npm-workspaces monorepo), NOT this buildless app.
+This `opcodestockapp` repo is the engine's origin + brainstorm/spec/plan history; it is frozen
+at Part 2 (engine v1.7.0, `upgrade/site-overhaul`, 55 tests). All new work happens in smartinvest.
 
-## What shipped this session
-1. **Brainstorm → spec → plan** for "generalize providers" (`docs/superpowers/specs|plans/2026-06-20-providers*`).
-2. **Live probe**: `codex` and `agy` both web-search. Findings + fixtures saved
-   (`docs/superpowers/notes/2026-06-20-codex-agy-probe.md`, `tests/fixtures/{codex-stream.jsonl,agy-stream.txt}`).
-3. **Engine (Tasks 1–8)** — framework-agnostic Node, ports straight into a Next.js API route:
-   - `providers/base.js` (interface + buildPrompt/cleanEnv/helpers), `providers/claude.js`
-     (refactor, back-compat preserved), `providers/codex.js`, `providers/agy.js`, `providers/api.js`
-     (OpenAI-compatible SSE, web-mode gating, cross-chunk buffering).
-   - `settings.js` — gitignored `.secrets.json` store; `publicView` never leaks a key value;
-     `FMP_API_KEY` env still honored.
-   - `ai-research.js` — cascade orchestrator (`claude→codex→agy→api`, capacity-only fall-through,
-     web-capable-only filter, manual `provider` override). Signature unchanged; `_spawn` seam kept.
-4. **Adversarial review** (3 lenses, haiku): confirmed no secret leak; fixed CAPACITY drift,
-   added `api.run` fast-fail + `webOf` guard + 4 edge tests. (Caught + rejected 2 false-positive
-   "critical" findings — verified against the code.)
+## smartinvest — what shipped this session (6 commits on `main`, NOT yet on GitHub)
+1. **Monorepo bootstrap** — `apps/web` (the external Next.js app, git history dropped) +
+   `packages/ai-engine` (this engine, name `@smartinvest/ai-engine`, CJS, subpath exports
+   `./settings` `./cache`). Root npm workspaces. Engine **42 tests** green in-workspace.
+2. **Engine** — added optional `context.instruction` passthrough in `buildPrompt` (powers the
+   card's Focus selector). Otherwise lifted verbatim.
+3. **Routes** (`apps/web/src/app/api/`):
+   - `GET/POST /api/settings` — server-side keys, booleans-only public view, never leaks a key.
+   - `GET /api/ai-research` — SSE streaming the real cascade; cache v2 `airesearch-v2-<prov|auto>-<SYM>`
+     (60-min TTL), `AI_RESEARCH_FAKE` seam, symbol `^[A-Z.]{1,16}$` + provider validation,
+     `friendlyError` mapping. `routes.test.mjs` = **6 integration tests** green.
+4. **Frontend** — `analysis-card.tsx` rewired: provider select (from /api/settings), "AI Research"
+   streams real reports via EventSource w/ progressive markdown + Re-run, Focus→instruction,
+   heuristic kept as free "Quick snapshot", insecure localStorage LLM-key picker removed.
+   New `ai-providers-card.tsx` (key entry + status badges), `lib/ai-markdown.ts`. Mounted in
+   `research-dashboard.tsx`.
+5. **Bundling fix** (real bug found + fixed): Turbopack rewrites the engine's `__dirname`, which
+   silently broke disk-cache writes. Fixed by pinning absolute `SECRETS_PATH` + `AI_CACHE_DIR` in
+   `next.config.ts` before routes load (+ `AI_CACHE_DIR` env override in `cache.js`,
+   `serverExternalPackages`). Verified: seeded-cache read hits through the route in 0.26s.
 
-## Verify
-- `npm test` **55 green**, `npm run test:e2e` **9 green**.
-- Built largely via ultracode workflows: a haiku build-fan-out (4 modules + verify) and a haiku
-  3-lens review-fan-out; sequential integration + all fixes done on the main loop.
+## Verify (all green)
+- Engine: `npm test -w @smartinvest/ai-engine` → **42**.
+- Routes: `node --test apps/web/tests/routes.test.mjs` → **6** (boots Next dev, fake seam).
+- Build: `npm run build -w web` → exit 0, "Compiled successfully" (NFT trace warning is cosmetic).
+- **Live**: a real claude/haiku run streamed a genuine, dated, web-searched AAPL report through
+  `/api/ai-research` (provider=claude, ~93s), and the cache hit on replay.
 
-## Build decisions this session (by the user)
-- **Merge two projects**: adopt external Next.js/shadcn app `bj1960-del/stock-research-app` as the
-  NEW frontend; port this engine (+ alerts, proxy) into it. This REPLACES the old "Part 3 UI redo".
-  Memory: `merge-nextjs-frontend.md`.
-- **Sequencing**: finish the framework-agnostic engine (Tasks 1–8) now; **hold** the vanilla-UI
-  tail (server `/settings` routes + Settings card) since the merge reimplements them in React.
+## BLOCKER (remote only — does not block local work)
+- `gh repo create` fails: the env `GITHUB_TOKEN` (AryaVora621) lacks repo-creation scope
+  (`Resource not accessible by personal access token`). smartinvest is committed locally but has
+  **no GitHub remote yet**. User must create an empty repo (web UI or a token with `repo` scope),
+  then `git -C ../smartinvest remote add origin <url> && git push -u origin main`.
 
-## Next action
-- **Push** `upgrade/site-overhaul` if desired (engine is a clean stopping point).
-- **Start the merge** (the new "Part 3"): brainstorm how to fold this engine + alerts + Yahoo proxy
-  into the Next.js app (API routes / server actions), then Part 4 = Telegram bot (imports `runResearch`).
-- Deferred-from-spec (do during the merge, not on the buildless app): `GET/POST /settings`,
-  cache-key v2 (`airesearch-v2-<provider>-<sym>`), provider `&provider=` override + `friendlyError`
-  cases, Settings "AI Providers" UI. All listed in `docs/superpowers/plans/2026-06-20-providers.md`
-  Tasks 9–10.
+## Next actions (later slices, per the merge plan)
+- Slice 2: alerts. Slice 3: Yahoo proxy/cache/FMP resilience port. Slice 4: theme.
+- Slice 5: Telegram bot as `apps/bot` (imports `@smartinvest/ai-engine` `runResearch`) — see
+  memory `telegram-bot-goal.md`.
+- Spec/plan for Slice 1 live in this repo: `docs/superpowers/specs/2026-06-21-merge-slice1-design.md`,
+  `docs/superpowers/plans/2026-06-21-merge-slice1.md`.

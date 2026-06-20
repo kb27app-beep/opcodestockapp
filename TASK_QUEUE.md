@@ -25,15 +25,19 @@
   Web-capable-only cascade, capacity-only fall-through, manual override. `npm test` 55, e2e 9.
   Committed (not yet pushed). Engine only — vanilla-UI tail held for the Next.js merge.
 
-## Next up
-- **Project merge (new "Part 3")**: adopt external Next.js/shadcn app `bj1960-del/stock-research-app`
-  as the new frontend; port this engine (+ alerts, Yahoo proxy) in as API routes / server actions.
-  Brainstorm first. Memory: `merge-nextjs-frontend.md`.
-- Then **Part 4 — Telegram bot** (US market, daily/hourly/on-demand) reusing `runResearch`.
+## Merge — DONE: Slice 1 (active repo is now ../smartinvest)
+- **Merge Slice 1 (DONE, local-only)**: npm-workspaces monorepo `../smartinvest` — `apps/web`
+  (external Next.js app) + `packages/ai-engine` (this engine). Streaming `/api/ai-research` (SSE)
+  + `/api/settings` (server-side keys) wired into the analysis card + an AI Providers card. Engine
+  42 tests, routes 6 tests, build green, live claude run verified. The deferred tail below is now
+  SHIPPED in smartinvest: `/api/settings`, cache v2, `&provider=` override + `friendlyError`,
+  AI Providers card. See smartinvest `CHECKPOINT`-equivalent in opcodestockapp/CHECKPOINT_LAST.md.
+  REMOTE BLOCKER: env GITHUB_TOKEN can't create repos — user must create the GitHub repo, then push.
 
-## Deferred (do inside the merge, not on the buildless app)
-- `GET/POST /settings` routes, cache-key v2 (`airesearch-v2-<provider>-<sym>`), `&provider=`
-  override + `friendlyError` cases, Settings "AI Providers" card. (plan Tasks 9–10.)
+## Next up (in ../smartinvest)
+- Slice 2: alerts. Slice 3: Yahoo proxy/cache/FMP resilience. Slice 4: theme.
+- **Slice 5 — Telegram bot** as `apps/bot` (US market, daily/hourly/on-demand) reusing
+  `@smartinvest/ai-engine` `runResearch`. Memory: `telegram-bot-goal.md`.
 
 ## Later / future
 - Anchor the multi-year financial trend charts to real data (Yahoo gives TTM only — needs a

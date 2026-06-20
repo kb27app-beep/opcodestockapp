@@ -1,5 +1,11 @@
 # RESUME STATE — for ultracode session
 
+> ⚠️ **ACTIVE REPO MOVED (2026-06-21): work now happens in `../smartinvest`** (npm-workspaces
+> monorepo: `apps/web` Next.js + `packages/ai-engine`). Merge Slice 1 is DONE there (streaming
+> AI Research wired into the Next.js app). This `opcodestockapp` repo is now the engine's origin +
+> brainstorm/spec/plan history, frozen at Part 2. **Read `CHECKPOINT_LAST.md` first** for the
+> current state + the GitHub-remote blocker. The section below is pre-merge history.
+
 Read this first, then `CHECKPOINT_LAST.md`, the specs/plans under `docs/superpowers/`, and the
 memories `merge-nextjs-frontend.md` + `telegram-bot-goal.md`. Single handoff for picking work up.
 
