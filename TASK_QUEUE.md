@@ -13,10 +13,13 @@
 - Feature A (v1.4.0): real-time background alert polling — unified dispatchAlert (push/email/
   telegram, whatsapp=unsupported), setInterval poller in main.js, Settings card, re-crossing
   re-arm, api.telegram.org added to SSRF allowlist. Tests: npm test 13, test:e2e 8. Committed + pushed.
+- Feature B (v1.5.0): optional paid fundamentals fallback — new fundamentals-fallback.js (FMP),
+  wired into /yf-fundamentals on Yahoo failure (gated on FMP_API_KEY), debt/equity ×100 unit fix,
+  source checks broadened via isRealSource() in js/data.js, /yf-status reports fallbackConfigured
+  (boolean). Tests: npm test 15, test:e2e 8. Committed + pushed.
 
-## Next up (see PLAN_NEXT.md for the full brief)
-- [ ] Feature B: optional paid fundamentals fallback (FMP via FMP_API_KEY env var).
-      Remember to broaden the source==='yahoo-quoteSummary' checks in js/data.js (:144, :383).
+## Next up
+- (none — both planned features A and B are complete.)
 
 ## Later / future
 - Anchor the multi-year financial trend charts to real data (Yahoo gives TTM only — needs a

@@ -39,7 +39,10 @@ test('/healthz returns ok', async () => {
 test('/yf-status returns state shape', async () => {
   const r = await get('/yf-status');
   assert.strictEqual(r.status, 200);
-  assert.ok('loaded' in JSON.parse(r.body));
+  const body = JSON.parse(r.body);
+  assert.ok('loaded' in body);
+  // Fallback key is unset in the test environment — reported as a boolean false, never the key.
+  assert.strictEqual(body.fallbackConfigured, false);
 });
 
 test('/proxy blocks SSRF to private/metadata hosts', async () => {

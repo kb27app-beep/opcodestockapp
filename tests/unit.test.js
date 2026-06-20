@@ -7,6 +7,7 @@ const path = require('path');
 
 const cache = require('../cache');
 const { normalize } = require('../yahoo-auth');
+const { normalizeFmp } = require('../fundamentals-fallback');
 
 test('cache: write then read returns data and freshness', () => {
   const key = 'unittest-' + process.pid;
@@ -62,4 +63,38 @@ test('normalize: missing fields become null, not crashes', () => {
 
 test('normalize: null input returns null', () => {
   assert.strictEqual(normalize(null), null);
+});
+
+test('normalizeFmp: maps FMP payload to the yahoo-auth shape with source fmp', () => {
+  const n = normalizeFmp({
+    profile: { mktCap: 3.4e12, sector: 'Technology', industry: 'Consumer Electronics',
+               companyName: 'Apple Inc.', beta: 1.2, currency: 'USD' },
+    ratios: { peRatioTTM: 36.07, returnOnEquityTTM: 1.41, netProfitMarginTTM: 0.25,
+              operatingProfitMarginTTM: 0.31, priceToBookRatioTTM: 50,
+              debtEquityRatioTTM: 0.795, dividendYielTTM: 0.005 },
+    income: { revenue: 451442016256, eps: 6.1 },
+    cashflow: { freeCashFlow: 9.9e10 },
+    balance: { cashAndCashEquivalents: 3e10, totalDebt: 1.1e11 },
+  });
+  assert.strictEqual(n.source, 'fmp');
+  assert.strictEqual(n.marketCap, 3.4e12);
+  assert.strictEqual(n.trailingPE, 36.07);
+  assert.strictEqual(n.longName, 'Apple Inc.');
+  assert.strictEqual(n.returnOnEquity, 1.41);
+  assert.strictEqual(n.profitMargins, 0.25);
+  assert.strictEqual(n.totalRevenue, 451442016256);
+  assert.strictEqual(n.eps, 6.1);
+  assert.strictEqual(n.freeCashflow, 9.9e10);
+  assert.strictEqual(n.totalCash, 3e10);
+  // debtEquityRatioTTM is a ratio (0.795); Yahoo convention is a percent — expect *100.
+  assert.ok(Math.abs(n.debtToEquity - 79.5) < 1e-9, 'debt/equity ratio should be scaled to percent');
+});
+
+test('normalizeFmp: missing sections degrade to null without crashing', () => {
+  const n = normalizeFmp({ profile: { companyName: 'X' } });
+  assert.strictEqual(n.source, 'fmp');
+  assert.strictEqual(n.longName, 'X');
+  assert.strictEqual(n.marketCap, null);
+  assert.strictEqual(n.debtToEquity, null);
+  assert.strictEqual(n.totalRevenue, null);
 });

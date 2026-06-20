@@ -1,6 +1,13 @@
 // data.js — Navigation, Yahoo data fetch, fundamentals, symbol resolution, analysis extraction
 // Part of ARYA'S Stocks Pro. Loaded as an ordered classic script (shared globals).
 
+// Which fundamentals sources count as genuine live data (vs. sector-template estimates).
+// Yahoo is the primary path; 'fmp' is the optional paid fallback (see fundamentals-fallback.js).
+const REAL_FUNDAMENTAL_SOURCES = ['yahoo-quoteSummary', 'fmp'];
+function isRealSource(source) {
+  return !!source && REAL_FUNDAMENTAL_SOURCES.includes(source);
+}
+
 // ============================================================
 // NAVIGATION
 // ============================================================
@@ -141,7 +148,7 @@ async function searchStock() {
     await runAllAnalyses();
     showPage('dashboard');
     renderDashboard();
-    const real = state._extraData && state._extraData.source === 'yahoo-quoteSummary';
+    const real = state._extraData && isRealSource(state._extraData.source);
     showStatus(`✓ ${symbol} analyzed${real ? ' · live fundamentals' : ' · estimated fundamentals'}`, 'success');
   } catch (err) {
     console.error(err);
@@ -380,7 +387,7 @@ function extractAnalysisData(sd) {
   // These are genuine TTM/current figures — the analysis modules use them in place of
   // sector-guess templates and mark anything still synthetic with (est.).
   const f = state._fundamentals || {};
-  const fundamentalsReal = f.source === 'yahoo-quoteSummary';
+  const fundamentalsReal = isRealSource(f.source);
 
   return {
     name,

@@ -99,6 +99,9 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === '/yf-status') {
     let state = { loaded: false };
     try { state = { loaded: true, ...require('./yahoo-auth')._state() }; } catch (_) {}
+    // Boolean only — never leak whether the actual key value, just that one is set.
+    try { state.fallbackConfigured = require('./fundamentals-fallback').isConfigured(); }
+    catch (_) { state.fallbackConfigured = false; }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify(state));
   }
@@ -163,6 +166,27 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ symbol, data }));
     } catch (e) {
+      // Yahoo failed. If a paid fallback key is configured, try FMP and serve its data
+      // (normalized to the same shape) so the dashboard still shows live fundamentals.
+      const cache = require('./cache');
+      const FUND_TTL_MS = 6 * 60 * 60 * 1000;   // 6h, same horizon as yahoo-auth's cache
+      const fallback = require('./fundamentals-fallback');
+      if (fallback.isConfigured()) {
+        const key = 'fund-' + symbol;
+        try {
+          const data = await fallback.getFromProvider(symbol);
+          cache.write(key, data);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({ symbol, data }));
+        } catch (fe) {
+          // Last resort: any cached fallback/Yahoo data, even if stale.
+          const hit = cache.read(key, null);
+          if (hit && hit.data) {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            return res.end(JSON.stringify({ symbol, data: { ...hit.data, stale: true } }));
+          }
+        }
+      }
       const status = e && e.code === 429 ? 429 : 503;
       res.writeHead(status, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ error: e.message, fundamentals: null }));

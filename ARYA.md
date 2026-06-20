@@ -210,6 +210,25 @@ state = {
 
 ---
 
+## 8a-2. Changelog (v1.5.0) — optional paid fundamentals fallback
+
+- **Feature B — paid fundamentals fallback (FMP)**: when the free Yahoo path fails (no local
+  Chrome, a 503, or a persistent 429) and a `FMP_API_KEY` is configured **server-side**, the
+  `/yf-fundamentals` endpoint falls back to **Financial Modeling Prep** and returns the same
+  normalized shape, so the dashboard still renders genuine live numbers (no `(est.)` markers).
+- New module `fundamentals-fallback.js`: `getFromProvider(symbol)` fetches FMP profile / ratios-ttm
+  / income / cash-flow / balance-sheet and `normalizeFmp(...)` maps them to the exact
+  `yahoo-auth.normalize` keys. Units are reconciled to Yahoo's conventions — notably FMP's
+  `debtEquityRatioTTM` is a ratio (0.36) and is scaled ×100 to Yahoo's percent (36). `source: 'fmp'`.
+- Fallback results are cached the same way (`fund-<sym>`); a stale cache entry is served as a last
+  resort if FMP also fails. The frontend's "is real" checks (`js/data.js`) now treat both
+  `yahoo-quoteSummary` and `fmp` as live via a shared `isRealSource()` helper.
+- **Config:** set `FMP_API_KEY` in the server environment only (never sent from the client, never
+  returned). `/yf-status` exposes `fallbackConfigured` as a **boolean** so the UI can show whether a
+  fallback is available without leaking the key. Feature stays fully off when the var is unset.
+- Tests: +2 unit (`normalizeFmp` shape + debt/equity ×100; missing sections degrade to null),
+  `/yf-status` now asserts `fallbackConfigured:false` when unset. `npm test` 15, `npm run test:e2e` 8.
+
 ## 8a-1. Changelog (v1.4.0) — real-time alert polling
 
 - **Feature A — background alert polling**: while the tab is open, watchlist prices refresh on a
