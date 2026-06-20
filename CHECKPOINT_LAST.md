@@ -6,7 +6,7 @@
 This `opcodestockapp` repo is the engine's origin + brainstorm/spec/plan history; it is frozen
 at Part 2 (engine v1.7.0, `upgrade/site-overhaul`, 55 tests). All new work happens in smartinvest.
 
-## smartinvest — what shipped this session (6 commits on `main`, NOT yet on GitHub)
+## smartinvest — what shipped this session (5 commits on `main`, NOT yet on GitHub)
 1. **Monorepo bootstrap** — `apps/web` (the external Next.js app, git history dropped) +
    `packages/ai-engine` (this engine, name `@smartinvest/ai-engine`, CJS, subpath exports
    `./settings` `./cache`). Root npm workspaces. Engine **42 tests** green in-workspace.
