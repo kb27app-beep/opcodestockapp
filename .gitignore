@@ -6,3 +6,6 @@ Thumbs.db
 # local caches & screenshots
 .cache/
 *.png
+
+# server-side secret store (provider API keys) — never commit
+.secrets.json
