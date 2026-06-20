@@ -18,8 +18,22 @@
   source checks broadened via isRealSource() in js/data.js, /yf-status reports fallbackConfigured
   (boolean). Tests: npm test 15, test:e2e 8. Committed + pushed.
 
+- Part 1 AI Research (v1.6.0): on-demand claude -p streamed research panel + reusable
+  `ai-research.js` engine. Committed + pushed.
+- Part 2 AI engine (v1.7.0): generalized to a multi-provider cascade — providers/{base,claude,
+  codex,agy,api}.js + settings.js secret store + orchestrator. codex+agy probed web-capable.
+  Web-capable-only cascade, capacity-only fall-through, manual override. `npm test` 55, e2e 9.
+  Committed (not yet pushed). Engine only — vanilla-UI tail held for the Next.js merge.
+
 ## Next up
-- (none — both planned features A and B are complete.)
+- **Project merge (new "Part 3")**: adopt external Next.js/shadcn app `bj1960-del/stock-research-app`
+  as the new frontend; port this engine (+ alerts, Yahoo proxy) in as API routes / server actions.
+  Brainstorm first. Memory: `merge-nextjs-frontend.md`.
+- Then **Part 4 — Telegram bot** (US market, daily/hourly/on-demand) reusing `runResearch`.
+
+## Deferred (do inside the merge, not on the buildless app)
+- `GET/POST /settings` routes, cache-key v2 (`airesearch-v2-<provider>-<sym>`), `&provider=`
+  override + `friendlyError` cases, Settings "AI Providers" card. (plan Tasks 9–10.)
 
 ## Later / future
 - Anchor the multi-year financial trend charts to real data (Yahoo gives TTM only — needs a

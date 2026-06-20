@@ -210,6 +210,38 @@ state = {
 
 ---
 
+## 8a-4. Changelog (v1.7.0) — multi-provider AI engine (cascade) [engine only]
+
+- **Generalized the AI engine** from claude-only to a provider cascade. `ai-research.js` is now a
+  thin orchestrator; each provider is a small module under `providers/` implementing one interface
+  (`id`, `label`, `webCapable`, `isAvailable`, `run`). `runResearch`'s signature is unchanged, so
+  the running server and the future Telegram bot keep working.
+- **Providers**: `claude` (subscription CLI, stream-json), `codex` (`codex exec --json` with
+  `-c tools.web_search=true` + `--ignore-user-config` to dodge a global-skill hijack), `agy`
+  (`agy --print`, Gemini Google-Search grounding), and a generic `api` provider — one
+  OpenAI-compatible streaming client covering OpenRouter / OpenAI / Perplexity (and Anthropic /
+  Google via OpenRouter). Probe confirmed **codex and agy both web-search**.
+- **Cascade**: tries providers free-local-first (`claude → codex → agy → api`). Only true capacity
+  failures (`rate_limited`, `not_authenticated`, `cli_missing`, `busy`) fall through to the next
+  provider; a genuine content error stops and surfaces. **Web-capable only** — a provider that
+  can't web-search is excluded so every report stays cited. Manual per-run override supported.
+- **Server-side secret store** `settings.js` → gitignored `.secrets.json`. `publicView()` returns
+  only booleans (`configured: {api, fmp}`), **never a key value**; `FMP_API_KEY` env still honored.
+  Keys are never returned to the client and never travel in a query string.
+- **Held for the Next.js merge** (see below): the in-app `GET/POST /settings` routes, cache-key
+  versioning, and the Settings "AI Providers" card. Those get reimplemented as Next.js API routes /
+  React components when the frontend is replaced, so they were intentionally not built on the
+  buildless UI.
+- Tests: +31 (base helpers, codex/agy/api/settings providers, cascade orchestrator + edge cases).
+  `npm test` **55**, `npm run test:e2e` **9**. Engine reviewed via a 3-lens adversarial pass
+  (secret-leak: none; cascade-correctness; spec-completeness).
+- Spec + plan + probe: `docs/superpowers/specs/2026-06-20-providers-design.md`,
+  `docs/superpowers/plans/2026-06-20-providers.md`,
+  `docs/superpowers/notes/2026-06-20-codex-agy-probe.md`.
+- **Next: project merge.** Decision (2026-06-20): adopt the external Next.js/shadcn app
+  `bj1960-del/stock-research-app` as the new frontend and port this engine (+ alerts, proxy) into
+  it as API routes. This replaces the planned "UI redo". See `RESUME_ULTRACODE.md`.
+
 ## 8a-3. Changelog (v1.6.0) — on-demand AI Research panel (claude -p, streamed)
 
 - **AI Research panel**: per US stock, an "AI Research" button streams a live, web-searched

@@ -1,37 +1,43 @@
 # CHECKPOINT — ARYA'S Stocks Pro
 
-## STATUS: AI Research panel (v1.6.0) built, tested, verified live — ready to commit
+## STATUS: Part 2 multi-provider AI engine (v1.7.0) — DONE, tested, reviewed
 
-Branch `upgrade/site-overhaul`. First slice of the AI layer is done end to end.
+Branch `upgrade/site-overhaul`. Engine generalized from claude-only to a provider cascade.
+All committed (latest: review fixes `0dc5f51`). NOT pushed yet.
 
 ## What shipped this session
-1. **Port/process cleanup + server hardening** (`server.js`): killed orphaned `node server.js`
-   instances; auto-open browser only on default launch; EADDRINUSE exits cleanly. Use
-   http://localhost:3000.
-2. **SQLite wasm pin** (`js/state.js`): locateFile pinned to sql.js@1.10.2 (was a mismatched
-   sql.js.org build → LinkError). Proxy-unreachable error now actionable (`js/data.js`).
-3. **AI Research panel (v1.6.0)** — on-demand `claude -p` streamed research for US stocks:
-   - `ai-research.js` (engine, reusable by the Telegram bot): buildPrompt, parseStreamJsonLine,
-     runResearch (spawn claude, stream-json deltas, typed errors, 240s timeout, max 2 concurrent).
-   - `server.js` `GET /ai-research` SSE endpoint + cache (`airesearch-v1-<SYM>`, 60 min).
-   - `js/ai-research.js` + index.html/styles.css: button, streamed markdown panel, Re-run.
-   - Runs on the Claude **subscription** (strips ANTHROPIC_API_KEY). Default model sonnet;
-     `?model=haiku` to save quota.
-   - **Hijack guard**: `--disallowedTools Skill Task Workflow TodoWrite` + inline directive so
-     headless claude answers inline instead of forking a deep-research workflow.
+1. **Brainstorm → spec → plan** for "generalize providers" (`docs/superpowers/specs|plans/2026-06-20-providers*`).
+2. **Live probe**: `codex` and `agy` both web-search. Findings + fixtures saved
+   (`docs/superpowers/notes/2026-06-20-codex-agy-probe.md`, `tests/fixtures/{codex-stream.jsonl,agy-stream.txt}`).
+3. **Engine (Tasks 1–8)** — framework-agnostic Node, ports straight into a Next.js API route:
+   - `providers/base.js` (interface + buildPrompt/cleanEnv/helpers), `providers/claude.js`
+     (refactor, back-compat preserved), `providers/codex.js`, `providers/agy.js`, `providers/api.js`
+     (OpenAI-compatible SSE, web-mode gating, cross-chunk buffering).
+   - `settings.js` — gitignored `.secrets.json` store; `publicView` never leaks a key value;
+     `FMP_API_KEY` env still honored.
+   - `ai-research.js` — cascade orchestrator (`claude→codex→agy→api`, capacity-only fall-through,
+     web-capable-only filter, manual `provider` override). Signature unchanged; `_spawn` seam kept.
+4. **Adversarial review** (3 lenses, haiku): confirmed no secret leak; fixed CAPACITY drift,
+   added `api.run` fast-fail + `webOf` guard + 4 edge tests. (Caught + rejected 2 false-positive
+   "critical" findings — verified against the code.)
 
 ## Verify
-- `npm test` 24 green, `npm run test:e2e` 9 green.
-- Live: real AAPL report (haiku) streamed all 7 sections + cited links to `event: done` in ~81s;
-  cached replay 0ms. Server running on :3000.
+- `npm test` **55 green**, `npm run test:e2e` **9 green**.
+- Built largely via ultracode workflows: a haiku build-fan-out (4 modules + verify) and a haiku
+  3-lens review-fan-out; sequential integration + all fixes done on the main loop.
 
-## Next action / decisions for human
-- Commit pending (per rules): new `ai-research.js`, `js/ai-research.js`, `docs/`, `tests/fixtures/`;
-  modified `server.js`, `js/{data,state}.js`, `index.html`, `styles.css`, `tests/*`, `ARYA.md`.
-  Push to `upgrade/site-overhaul` after commit if desired.
-- Decide default research model: sonnet (quality) vs haiku (cheaper quota). Currently sonnet.
+## Build decisions this session (by the user)
+- **Merge two projects**: adopt external Next.js/shadcn app `bj1960-del/stock-research-app` as the
+  NEW frontend; port this engine (+ alerts, proxy) into it. This REPLACES the old "Part 3 UI redo".
+  Memory: `merge-nextjs-frontend.md`.
+- **Sequencing**: finish the framework-agnostic engine (Tasks 1–8) now; **hold** the vanilla-UI
+  tail (server `/settings` routes + Settings card) since the merge reimplements them in React.
 
-## Later (planned next subprojects)
-- Generalize providers: codex / agy / Ollama / API keys (OpenRouter/OpenAI/Anthropic/Google).
-- UI redo + theme.
-- Telegram bot (daily/hourly/on-demand, US market) — reuses `ai-research.js` runResearch.
+## Next action
+- **Push** `upgrade/site-overhaul` if desired (engine is a clean stopping point).
+- **Start the merge** (the new "Part 3"): brainstorm how to fold this engine + alerts + Yahoo proxy
+  into the Next.js app (API routes / server actions), then Part 4 = Telegram bot (imports `runResearch`).
+- Deferred-from-spec (do during the merge, not on the buildless app): `GET/POST /settings`,
+  cache-key v2 (`airesearch-v2-<provider>-<sym>`), provider `&provider=` override + `friendlyError`
+  cases, Settings "AI Providers" UI. All listed in `docs/superpowers/plans/2026-06-20-providers.md`
+  Tasks 9–10.
