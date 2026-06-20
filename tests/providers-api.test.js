@@ -40,3 +40,12 @@ test('run maps 401 to not_authenticated', async () => {
     settings: { apiKey: 'bad', apiBaseUrl: 'https://openrouter.ai/api/v1', apiModel: 'x:online' },
   }), e => e.code === 'not_authenticated');
 });
+
+test('run fails fast (no fetch) when settings are incomplete', async () => {
+  let fetched = false;
+  await assert.rejects(api.run('NVDA', {}, () => {}, {
+    _fetch: async () => { fetched = true; return { ok: true, status: 200, body: Readable.from(['']) }; },
+    settings: { apiKey: 'k' },   // missing baseUrl + model
+  }), e => e.code === 'not_authenticated');
+  assert.strictEqual(fetched, false, 'must not POST when unconfigured');
+});

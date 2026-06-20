@@ -38,6 +38,12 @@ function run(symbol, context, onText, opts = {}) {
   const timeoutMs = opts.timeoutMs || 240000;
   const started = Date.now();
 
+  // Fail fast if not fully configured. The orchestrator already filters via isAvailable(),
+  // but a direct caller could reach here — avoid POSTing to `undefined/chat/completions`.
+  if (!settings.apiKey || !settings.apiBaseUrl || !settings.apiModel) {
+    return Promise.reject(typedError('API provider not configured', 'not_authenticated'));
+  }
+
   return new Promise((resolve, reject) => {
     const controller = new AbortController();
     const timer = setTimeout(() => {

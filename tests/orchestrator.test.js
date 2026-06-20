@@ -50,3 +50,21 @@ test('listProviders reports id/label/webCapable/available for every registered p
     assert.strictEqual(typeof p.webCapable, 'boolean');
   }
 });
+
+test('an unknown provider id in the order is skipped, not fatal', async () => {
+  const res = await runResearch('NVDA', {}, () => {}, { _providers: [ok('api')], _order: ['ghost', 'api'] });
+  assert.strictEqual(res.provider, 'api');
+});
+
+test('all_providers_exhausted message lists the per-provider reasons tried', async () => {
+  await assert.rejects(
+    runResearch('NVDA', {}, () => {}, { _providers: [cap('claude', 'rate_limited')], _order: ['claude'] }),
+    e => e.code === 'all_providers_exhausted' && /claude: rate_limited/.test(e.message));
+});
+
+test('cascade with no web-capable providers rejects as exhausted', async () => {
+  const noweb = { ...ok('codex'), webCapable: false };
+  await assert.rejects(
+    runResearch('NVDA', {}, () => {}, { _providers: [noweb], _order: ['codex'] }),
+    e => e.code === 'all_providers_exhausted');
+});

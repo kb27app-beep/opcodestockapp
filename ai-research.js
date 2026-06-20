@@ -14,8 +14,10 @@ const settingsMod = require('./settings');
 
 const MAX_CONCURRENT = 2;
 const DEFAULT_ORDER = ['claude', 'codex', 'agy', 'api'];
-// Codes that mean "this provider can't serve right now" -> try the next one.
-const CAPACITY = new Set(['rate_limited', 'not_authenticated', 'cli_missing', 'busy', 'spawn_error', 'no_output']);
+// Only these "can't serve right now" codes fall through to the next provider. Everything
+// else (no_output, spawn_error, exit_<n>, content errors) is a real failure we surface
+// rather than masking it by silently trying a different provider.
+const CAPACITY = new Set(['rate_limited', 'not_authenticated', 'cli_missing', 'busy']);
 const REGISTRY = { claude, codex, agy, api };
 let _inflight = 0;
 
@@ -53,7 +55,9 @@ async function runResearch(symbol, context, onText, opts = {}) {
     for (const id of order) {
       const p = reg[id];
       if (!p) { tried.push(`${id}: unknown`); continue; }
-      if (!webOf(p, s)) { tried.push(`${id}: not web-capable`); continue; }
+      let isWeb;
+      try { isWeb = webOf(p, s); } catch (_) { isWeb = false; }
+      if (!isWeb) { tried.push(`${id}: not web-capable`); continue; }
       const available = await Promise.resolve(p.isAvailable(s)).catch(() => false);
       if (!available) { tried.push(`${id}: unavailable`); continue; }
       try {
