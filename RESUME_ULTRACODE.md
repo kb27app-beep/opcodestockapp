@@ -62,15 +62,43 @@ that reuses a shared AI engine. Agreed build order is a vertical slice first, th
 6. **App port**: always 3000. server.js auto-opens a tab only on default launch; test/scratch
    spawns set PORT and must not. Don't leave orphaned `node server.js` around.
 
-## Open decisions for the user
+## Decisions made (2026-06-20, by the user)
 
-- Default research model: sonnet (quality) vs haiku (cheaper). Currently sonnet.
-- Push `upgrade/site-overhaul` to remote? (Committed locally only.)
-- Part 2 vs part 3 first (providers vs UI redo). Engine is ready for either.
+- ✅ Default research model is now **haiku** (cheapest quota). `?model=sonnet` for deeper reports.
+  Done in commit `2158487`.
+- ✅ Branch **pushed** to `origin/upgrade/site-overhaul` (latest pushed: `2158487`).
+- ✅ Build order: **Part 2 (providers) first, THEN Part 3 (UI redo).** User asked about doing them
+  in parallel — see note below; the recommendation is sequential 2 -> 3.
+
+## NEXT UP (do these in order)
+
+### Part 2 — Generalize providers (DO FIRST)
+Goal: the AI engine should use **local CLIs' free limits first** (claude already done; add
+`codex`, `agy`, optionally `ollama`), then fall back to **manual API keys** the user enters
+(OpenRouter, OpenAI, Anthropic API, Google, plus any market-data keys). Keep `runResearch`'s
+signature; add a provider strategy inside `ai-research.js` (or a sibling module) selected by an
+option/setting. API keys are entered in the Settings UI and stored server-side (NEVER returned to
+the client, NEVER in query strings) — follow the existing `FMP_API_KEY` server-only pattern and
+the perplexityKey settings-input pattern. All three local CLIs are installed
+(`claude` ~/.local/bin, `codex` /usr/local/bin, `agy` ~/.local/bin, `ollama` /usr/local/bin).
+Start by brainstorming -> spec -> plan -> subagent workflow.
+
+### Part 3 — UI redo + the user's theme (DO AFTER Part 2)
+Clean redesign following the user's theme (ASK them to describe/show the theme — current is
+"editorial fintech" / cream). Incorporates the new provider/key settings from Part 2.
+
+### Why NOT parallel
+Part 2 adds provider + API-key controls to the **Settings UI** and touches the AI panel; Part 3
+rewrites `index.html` / `styles.css` / `js/*` broadly. Running both at once will conflict in those
+shared files. Do Part 2 first so Part 3 redesigns a UI that already includes the new settings.
+(If you must parallelize, isolate Part 3 to pure visual/CSS + layout files and freeze Settings
+markup until Part 2 lands — risky; sequential is cleaner.)
 
 ## How to resume in ultracode
 
-1. Read this file + `CHECKPOINT_LAST.md` + `docs/superpowers/specs|plans/2026-06-20-ai-research-*`.
-2. Confirm green: `npm test` (24) and `npm run test:e2e` (9).
-3. Pick part 2 (providers) or part 3 (UI redo) with the user; brainstorm -> spec -> plan ->
-   subagent-driven workflow (haiku for mechanical tasks, sonnet only where needed, no opus).
+1. Read this file + `CHECKPOINT_LAST.md` + `docs/superpowers/specs|plans/2026-06-20-ai-research-*`
+   + memory `telegram-bot-goal.md`.
+2. Confirm green: `npm test` (24) and `npm run test:e2e` (9). App on http://localhost:3000 only.
+3. Start **Part 2**: brainstorming skill -> spec -> writing-plans -> subagent-driven Workflow.
+   Cost rule (standing): haiku for mechanical tasks, sonnet only where genuinely needed, NO opus.
+4. Then **Part 3** (UI redo) — ask the user for their theme first.
